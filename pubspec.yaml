@@ -1,0 +1,27 @@
+name: utopia_hotreload
+description: Advanced hot reload and hot restart functionality for Dart applications with true VM-based hot reload capabilities.
+version: 1.0.0
+
+homepage: https://github.com/utopia-dart/utopia_http
+repository: https://github.com/utopia-dart/utopia_http
+issue_tracker: https://github.com/utopia-dart/utopia_http/issues
+
+environment:
+  sdk: '>=2.17.0 <4.0.0'
+
+dependencies:
+  vm_service: ^14.0.0
+  watcher: ^1.1.0
+  path: ^1.8.0
+  meta: ^1.9.0
+
+dev_dependencies:
+  test: ^1.21.0
+  lints: ^3.0.0
+
+topics:
+  - hot-reload
+  - development
+  - server
+  - dart-vm
+  - file-watching

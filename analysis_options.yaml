@@ -1,0 +1,14 @@
+include: package:lints/recommended.yaml
+
+linter:
+  rules:
+    # Additional rules for better code quality
+    prefer_single_quotes: true
+    unnecessary_const: true
+    unnecessary_new: true
+    avoid_print: false  # Allow print statements for development tools
+    
+analyzer:
+  exclude:
+    - "**/.dart_tool/**"
+    - "**/build/**"
