@@ -1,11 +1,3 @@
-#!/usr/bin/env dart
-
-/// Comprehensive example demonstrating Utopia Hot Reload features.
-///
-/// This example shows how to use the package with a simple HTTP server
-/// and demonstrates hot reload/restart functionality.
-///
-/// To run: `dart run example/example.dart`
 import 'dart:io';
 import 'package:utopia_hotreload/utopia_hotreload.dart';
 
