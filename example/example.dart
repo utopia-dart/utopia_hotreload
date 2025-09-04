@@ -30,7 +30,7 @@ Future<void> runApplication() async {
   print('');
 
   // Create a simple HTTP server
-  final server = await HttpServer.bind('localhost', 8080);
+  final server = await HttpServer.bind('localhost', 8081);
 
   print('🌐 Server running on: http://localhost:8080');
   print('');
@@ -82,7 +82,7 @@ Future<void> handleHomePage(HttpResponse response) async {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Utopia hot reload</title>
+    <title>Utopia hotreload example</title>
     <style>
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;

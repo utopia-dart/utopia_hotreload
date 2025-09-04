@@ -128,6 +128,7 @@ class DeveloperTools {
     ],
     Duration debounceDelay = const Duration(milliseconds: 500),
     bool verbose = false,
+    int? childVmServicePort,
   }) async {
     // Check if this is already the development server process
     if (Platform.environment['UTOPIA_DEV_MODE'] == 'true') {
@@ -146,6 +147,7 @@ class DeveloperTools {
       ignorePatterns: ignorePatterns,
       debounceDelay: debounceDelay,
       verbose: verbose,
+      childVmServicePort: childVmServicePort,
     );
 
     print('🔥 Hot reload enabled. Press:');
@@ -221,6 +223,7 @@ class _DevelopmentServer {
   VmService? _childVmService;
   String? _childIsolateId;
   bool _vmConnected = false;
+  int? _childVmPort; // Keep child VM service port stable across restarts
 
   _DevelopmentServer({required this.config});
 
@@ -375,10 +378,20 @@ class _DevelopmentServer {
 
   Future<void> _startUserScript() async {
     final scriptPath = Platform.script.toFilePath();
+
+    // Filter out VM service flags from parent args to avoid conflicts
+    final parentArgs = Platform.executableArguments.where((arg) {
+      return !(arg.startsWith('--enable-vm-service') ||
+          arg.startsWith('--observe') ||
+          arg.startsWith('--disable-service-auth-codes'));
+    }).toList();
+
+    // Reuse the same VM service port for child if known; otherwise optional config or random
+    final vmPort = _childVmPort ?? config.childVmServicePort ?? 0;
     final args = [
-      '--enable-vm-service=0',
+      '--enable-vm-service=$vmPort',
       '--disable-service-auth-codes',
-      ...Platform.executableArguments,
+      ...parentArgs,
       scriptPath,
     ];
 
@@ -436,6 +449,13 @@ class _DevelopmentServer {
     final uriStr = line.substring(idx + marker.length).trim();
     // Example: http://127.0.0.1:58858/
     _connectToChildVmService(uriStr);
+    // Remember the child's VM service port for reuse on subsequent restarts
+    try {
+      final uri = Uri.parse(uriStr);
+      if (uri.hasPort && uri.port > 0) {
+        _childVmPort = uri.port;
+      }
+    } catch (_) {}
   }
 
   Future<void> _connectToChildVmService(String httpUri) async {
@@ -514,6 +534,8 @@ class _DevelopmentServer {
       _isRestarting = true;
       // Kill current user process
       await _killUserProcess();
+      // Small delay to allow OS to release VM service port
+      await Future.delayed(Duration(milliseconds: 150));
 
       // Start new user process
       await _startUserScript();

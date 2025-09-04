@@ -30,6 +30,13 @@ class ReloadConfig {
   /// Whether to enable verbose logging
   final bool verbose;
 
+  /// Fixed VM service port for child process (DeveloperTools) to enable
+  /// true hot reload without changing the port across hot restarts.
+  ///
+  /// If null, a random available port is chosen on first start and reused
+  /// for subsequent restarts during this session.
+  final int? childVmServicePort;
+
   const ReloadConfig({
     this.mode = ReloadMode.auto,
     this.watchPaths = const ['lib'],
@@ -48,5 +55,6 @@ class ReloadConfig {
     ],
     this.debounceDelay = const Duration(milliseconds: 500),
     this.verbose = false,
+    this.childVmServicePort,
   });
 }
