@@ -1,4 +1,3 @@
-import 'dart:io';
 import 'package:test/test.dart';
 import 'package:utopia_hotreload/src/file_watcher.dart';
 import 'package:utopia_hotreload/src/reload_mode.dart';

@@ -1,2 +1,26 @@
+# Dart tool and build files
 .dart_tool/
+.packages
+build/
+pubspec.lock
+
+# Coverage files
+coverage/
+*.lcov
+
+# IDE files
+.vscode/
+.idea/
+*.iml
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Test artifacts
+test/.test_runner.dart
+
+# Temporary files
+*.tmp
+*.temp
 

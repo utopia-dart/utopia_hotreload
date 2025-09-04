@@ -1,0 +1,83 @@
+name: CI
+
+on:
+  push:
+    branches: [ main, dev]
+  pull_request:
+    branches: [ main, dev ]
+  schedule:
+    # Run daily at 2 AM UTC to catch issues with dependency updates
+    - cron: '0 2 * * *'
+
+jobs:
+  analyze:
+    name: Analyze
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Dart
+        uses: dart-lang/setup-dart@v1
+        with:
+          sdk: stable
+
+      - name: Install dependencies
+        run: dart pub get
+
+      - name: Verify formatting
+        run: dart format --output=none --set-exit-if-changed .
+
+      - name: Analyze project source
+        run: dart analyze --fatal-infos
+
+      - name: Check for outdated dependencies
+        run: dart pub outdated --mode=null-safety --show-all
+
+  test:
+    name: Test
+    needs: analyze
+    runs-on: ${{ matrix.os }}
+    
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        sdk: [stable, beta]
+        
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Dart
+        uses: dart-lang/setup-dart@v1
+        with:
+          sdk: ${{ matrix.sdk }}
+
+      - name: Install dependencies
+        run: dart pub get
+
+      - name: Run unit tests
+        run: dart test test/ --reporter expanded --timeout=2m
+
+      - name: Run file watcher E2E tests
+        run: dart test test/e2e/file_watcher_e2e_test.dart --reporter expanded --timeout=5m
+
+      - name: Run real hot reload E2E test (Ubuntu only)
+        if: matrix.os == 'ubuntu-latest' && matrix.sdk == 'stable'
+        run: dart test test/e2e/real_hotreload_e2e_test.dart --reporter expanded --timeout=10m
+
+      - name: Generate test coverage (Ubuntu stable only)
+        if: matrix.os == 'ubuntu-latest' && matrix.sdk == 'stable'
+        run: |
+          dart pub global activate coverage
+          dart test --coverage=coverage test/ --timeout=5m
+          dart pub global run coverage:format_coverage --lcov --in=coverage --out=coverage/lcov.info --packages=.dart_tool/package_config.json --report-on=lib
+
+      - name: Upload coverage to Codecov
+        if: matrix.os == 'ubuntu-latest' && matrix.sdk == 'stable'
+        uses: codecov/codecov-action@v3
+        with:
+          file: coverage/lcov.info
+          fail_ci_if_error: false
