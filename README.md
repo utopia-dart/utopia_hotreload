@@ -2,6 +2,10 @@
 
 Advanced hot reload and hot restart functionality for Dart applications with true VM-based hot reload capabilities, similar to Flutter's development experience.
 
+[![Pub Version](https://img.shields.io/pub/v/utopia_hotreload)](https://pub.dev/packages/utopia_hotreload)
+[![Dart SDK Version](https://img.shields.io/badge/dart-%3E%3D2.17.0-blue)](https://dart.dev)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
 ## Features
 
 - **🔥 True Hot Reload**: Uses Dart VM service to reload code while preserving application state (like Flutter)
@@ -14,9 +18,6 @@ Advanced hot reload and hot restart functionality for Dart applications with tru
 ## Installation
 
 ```yaml
-dependencies:
-  utopia_http: ^0.2.0
-
 dev_dependencies:
   utopia_hotreload: ^1.0.0
 ```
@@ -142,24 +143,36 @@ The package always uses **auto mode** (like Flutter), which:
 
 ## How It Works
 
-### True Hot Reload
-- Uses Dart VM service's `reloadSources()` API
-- Preserves variable values, connection states, etc.
-- Requires `--enable-vm-service` flag (automatically handled)
-- Similar to Flutter's hot reload experience
+### True Hot Reload ✨
+- **Uses Dart VM Service's `reloadSources()` API** - Updates code in the running process
+- **Preserves application state** - Variables, connections, and server instances remain intact
+- **Same port, same PID** - Server continues running without interruption
+- **Requires `--enable-vm-service` flag** - Automatically enabled by the package
+- **Similar to Flutter's hot reload** - Instant code updates with state preservation
 
-### Hot Restart
-- Terminates and restarts the entire Dart process
-- Loses all application state
-- More compatible across different scenarios
-- Guaranteed to pick up all code changes
+### Hot Restart 🔄
+- **Terminates and restarts the entire Dart process** - Fresh compilation and clean state
+- **Loses all application state** - Variables reset, connections closed, new server instance
+- **New port, new PID** - Complete process restart
+- **More compatible across different scenarios** - Guaranteed to pick up all code changes
+- **Used as fallback** - When hot reload fails or for structural changes
 
 ### Automatic Fallback
+The package intelligently chooses the best reload method:
+
 ```
 📝 File changed: lib/server.dart
-🔥 Attempting hot reload...
+🔥 Performing true hot reload...
+✅ Hot reload completed - code updated in running process!
+```
+
+For structural changes that can't be hot reloaded:
+```
+📝 File changed: lib/server.dart
+🔥 Performing true hot reload...
 ❌ Hot reload failed: Structural changes detected
 🔄 Hot reload not available, performing hot restart...
+🔄 Performing true hot restart (restarting entire process)...
 ✅ Hot restart completed
 ```
 
@@ -183,7 +196,13 @@ The package always uses **auto mode** (like Flutter), which:
   '.git/',
   '.dart_tool/',
   'build/',
+  'test/',
+  '.packages',
   'pubspec.lock',
+  '.vscode/',
+  '.idea/',
+  '*.log',
+  '*.tmp',
 ]
 ```
 

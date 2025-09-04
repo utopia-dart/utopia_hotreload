@@ -1,19 +1,34 @@
 import 'dart:async';
+import 'dart:io';
+import 'dart:developer' as developer;
 
 import 'reload_mode.dart';
-import 'hot_reload_manager.dart';
+import 'auto_reload_manager.dart';
 
-/// Main interface for hot reload/restart functionality
-/// This replaces the old HttpDev class and works like Flutter's hot reload
+/// Main interface for hot reload/restart functionality.
+///
+/// This replaces the old HttpDev class and works like Flutter's hot reload,
+/// providing a seamless development experience with automatic reloading.
+///
+/// The DeveloperTools class provides a single entry point for starting
+/// a development server with hot reload capabilities.
 class DeveloperTools {
   DeveloperTools._();
 
-  /// Start a development server with auto hot reload/restart (like Flutter)
+  /// Start a development server with auto hot reload/restart (like Flutter).
   ///
   /// This automatically tries hot reload first, then falls back to hot restart
   /// if hot reload fails. Just like Flutter's behavior.
   ///
-  /// Example:
+  /// **Parameters:**
+  /// - [script]: Your application entry point function
+  /// - [watchPaths]: Directories to watch for changes (default: `['lib']`)
+  /// - [watchExtensions]: File extensions to monitor (default: `['.dart']`)
+  /// - [ignorePatterns]: Patterns to ignore when watching files
+  /// - [debounceDelay]: Delay before triggering reload (default: 500ms)
+  /// - [verbose]: Enable detailed logging (default: false)
+  ///
+  /// **Example:**
   /// ```dart
   /// void main() async {
   ///   await DeveloperTools.start(
@@ -31,10 +46,10 @@ class DeveloperTools {
   /// }
   /// ```
   ///
-  /// During development, use:
-  /// - 'r' + Enter: Hot reload (preserves state)
-  /// - 'R' + Enter: Hot restart (full restart)
-  /// - 'q' + Enter: Quit
+  /// **During development, use:**
+  /// - `r` + Enter: Hot reload (preserves state)
+  /// - `R` + Enter: Hot restart (full restart)
+  /// - `q` + Enter: Quit
   static Future<void> start({
     required Future<void> Function() script,
     List<String> watchPaths = const ['lib'],
@@ -48,6 +63,9 @@ class DeveloperTools {
     Duration debounceDelay = const Duration(milliseconds: 500),
     bool verbose = false,
   }) async {
+    // Check if VM service is enabled, if not, restart with VM service
+    await _ensureVmServiceEnabled();
+
     final config = ReloadConfig(
       mode: ReloadMode.auto, // Always auto mode like Flutter
       watchPaths: watchPaths,
@@ -66,5 +84,42 @@ class DeveloperTools {
     // Start the auto reload manager that tries hot reload first, then hot restart
     final manager = AutoReloadManager(script: script, config: config);
     await manager.start();
+  }
+
+  /// Ensure VM service is enabled for true hot reload
+  static Future<void> _ensureVmServiceEnabled() async {
+    try {
+      // Try to get service info
+      final serviceInfo = await developer.Service.getInfo();
+      if (serviceInfo.serverUri != null) {
+        // VM service is already enabled
+        return;
+      }
+    } catch (e) {
+      // Service not available
+    }
+
+    // VM service is not enabled, restart with it enabled
+    if (!Platform.executableArguments.any((arg) =>
+        arg.startsWith('--enable-vm-service') || arg.startsWith('--observe'))) {
+      print('🔄 Restarting with VM service enabled for true hot reload...');
+
+      final scriptPath = Platform.script.toFilePath();
+      final args = [
+        '--enable-vm-service=0', // Use port 0 for automatic port selection
+        '--disable-service-auth-codes',
+        ...Platform.executableArguments,
+        scriptPath,
+      ];
+
+      final process = await Process.start(Platform.executable, args);
+
+      // Forward stdout and stderr
+      process.stdout.listen((data) => stdout.add(data));
+      process.stderr.listen((data) => stderr.add(data));
+
+      final exitCode = await process.exitCode;
+      exit(exitCode);
+    }
   }
 }

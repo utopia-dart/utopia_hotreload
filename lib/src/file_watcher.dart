@@ -13,44 +13,61 @@ class HotReloadFileWatcher {
 
   /// Start watching for file changes
   Future<void> start(Function(String filePath) onFileChanged) async {
+    print('👁️  Setting up file watchers...');
+
     for (final path in config.watchPaths) {
       final dir = Directory(path);
       if (await dir.exists()) {
-        if (config.verbose) {
-          print('👁️  Watching directory: ${dir.absolute.path}');
-        }
+        print('👁️  Watching directory: ${dir.absolute.path}');
 
         final watcher = dir.watch(recursive: true).listen((event) {
           final filePath = event.path;
 
+          if (config.verbose) {
+            print(
+                '📁 File event: ${event.type} - ${_getRelativePath(filePath)}');
+          }
+
           // Check if file should be watched
-          if (!_shouldWatchFile(filePath)) return;
+          if (!_shouldWatchFile(filePath)) {
+            if (config.verbose) {
+              print(
+                  '⏭️  Skipping file (extension): ${_getRelativePath(filePath)}');
+            }
+            return;
+          }
 
           // Check ignore patterns
-          if (_shouldIgnoreFile(filePath)) return;
+          if (_shouldIgnoreFile(filePath)) {
+            if (config.verbose) {
+              print(
+                  '⏭️  Skipping file (ignored): ${_getRelativePath(filePath)}');
+            }
+            return;
+          }
 
           // Debounce file changes
           _debounceTimer?.cancel();
           _debounceTimer = Timer(config.debounceDelay, () {
             final relativePath = _getRelativePath(filePath);
-            if (config.verbose) {
-              print('📝 File changed: $relativePath');
-            }
+            print('📝 File changed: $relativePath');
             onFileChanged(filePath);
           });
+        }, onError: (error) {
+          print('❌ File watcher error for $path: $error');
         });
 
         _watchers.add(watcher);
       } else {
-        if (config.verbose) {
-          print('⚠️  Watch path does not exist: $path');
-        }
+        print('⚠️  Watch path does not exist: $path');
       }
     }
 
     if (_watchers.isEmpty) {
-      throw StateError('No valid watch paths found');
+      throw StateError('No valid watch paths found or no watchers started');
     }
+
+    print('✅ Started ${_watchers.length} file watcher(s)');
   }
 
   /// Stop watching for file changes
@@ -74,9 +91,27 @@ class HotReloadFileWatcher {
 
   /// Check if a file should be ignored based on patterns
   bool _shouldIgnoreFile(String filePath) {
+    final relativePath = _getRelativePath(filePath);
+
     for (final pattern in config.ignorePatterns) {
-      if (filePath.contains(pattern)) {
-        return true;
+      // Handle glob-like patterns
+      if (pattern.startsWith('**') && pattern.endsWith('**')) {
+        final innerPattern = pattern.substring(2, pattern.length - 2);
+        if (relativePath.contains(innerPattern)) {
+          return true;
+        }
+      } else if (pattern.contains('*')) {
+        // Simple wildcard matching
+        final regexPattern =
+            pattern.replaceAll('.', '\\.').replaceAll('*', '.*');
+        if (RegExp(regexPattern).hasMatch(relativePath)) {
+          return true;
+        }
+      } else {
+        // Simple string matching
+        if (relativePath.contains(pattern)) {
+          return true;
+        }
       }
     }
     return false;

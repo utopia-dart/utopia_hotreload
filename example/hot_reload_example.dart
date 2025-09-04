@@ -6,12 +6,31 @@ void main() async {
   await DeveloperTools.start(
     script: () async {
       print('🚀 Example server with hot reload functionality');
-      print('� Try changing this message and save the file!');
+      print('✨ Try changing this message and save the file!');
       print('');
 
-      // Simple HTTP server example
-      final server = await HttpServer.bind('127.0.0.1', 8080);
-      print('🌐 Server running on http://127.0.0.1:8080');
+      // Simple HTTP server example with robust port handling
+      late HttpServer server;
+      int port = 8080;
+
+      try {
+        // Try multiple ports starting from 8080
+        for (port = 8080; port <= 8090; port++) {
+          try {
+            server = await HttpServer.bind('127.0.0.1', port);
+            break;
+          } catch (e) {
+            if (port == 8090) rethrow;
+            continue;
+          }
+        }
+      } catch (e) {
+        // If all ports fail, use port 0 for automatic assignment
+        server = await HttpServer.bind('127.0.0.1', 0);
+        port = server.port;
+      }
+
+      print('🌐 Server running on http://127.0.0.1:$port');
       print('');
 
       await for (final request in server) {

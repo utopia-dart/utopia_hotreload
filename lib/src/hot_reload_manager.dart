@@ -172,35 +172,3 @@ class HotReloadManager {
     print('✅ Development server stopped');
   }
 }
-
-/// Hybrid manager that tries hot reload first, falls back to hot restart
-class AutoReloadManager {
-  final ReloadConfig config;
-  final Future<void> Function() script;
-
-  AutoReloadManager({
-    required this.script,
-    required this.config,
-  });
-
-  /// Start with automatic mode - tries hot reload, falls back to restart
-  Future<void> start() async {
-    try {
-      // Try to use true hot reload first
-      final hotReloadManager = HotReloadManager(
-        script: script,
-        config: config,
-      );
-      await hotReloadManager.start();
-    } catch (e) {
-      if (config.verbose) {
-        print('Hot reload not available: $e');
-        print('Falling back to hot restart mode...');
-      }
-
-      // Fall back to hot restart - import and use the actual class
-      // This will be resolved when both files are created
-      throw UnimplementedError('Hot restart fallback not yet implemented');
-    }
-  }
-}
