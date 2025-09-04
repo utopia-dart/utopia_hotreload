@@ -1,17 +1,17 @@
 #!/usr/bin/env dart
 
-// Comprehensive example demonstrating utopia_hotreload features
-//
-// This example shows how to use the package with a simple HTTP server
-// and demonstrates hot reload/restart functionality.
-//
-// To run: dart run example/comprehensive_example.dart
+/// Comprehensive example demonstrating Utopia Hot Reload features.
+///
+/// This example shows how to use the package with a simple HTTP server
+/// and demonstrates hot reload/restart functionality.
+///
+/// To run: `dart run example/example.dart`
 import 'dart:io';
 import 'package:utopia_hotreload/utopia_hotreload.dart';
 
 void main() async {
-  print('🚀 Utopia Hot Reload - Comprehensive Example');
-  print('=' * 50);
+  print('🚀 Utopia Hot Reload - Example');
+  print('=' * 40);
   print('');
 
   await DeveloperTools.start(
@@ -19,58 +19,31 @@ void main() async {
     watchPaths: ['lib', 'example'],
     watchExtensions: ['.dart'],
     debounceDelay: Duration(milliseconds: 300),
-    verbose: true,
+    verbose: false, // Set to true for detailed logging
   );
 }
 
-// Global server reference for cleanup
-HttpServer? _server;
-
-/// Main application logic
+/// Main application logic - this is what gets hot reloaded
 Future<void> runApplication() async {
   print('📊 Application starting...');
   print('🕐 Started at: ${DateTime.now()}');
-  print('🏠 PID: $pid');
   print('');
 
-  // Create a simple HTTP server with dynamic port allocation
-  int port = 8080;
+  // Create a simple HTTP server
+  final server = await HttpServer.bind('localhost', 8080);
 
-  try {
-    // Try multiple ports starting from 8080
-    for (port = 8080; port <= 8090; port++) {
-      try {
-        _server = await HttpServer.bind(InternetAddress.loopbackIPv4, port);
-        break;
-      } catch (e) {
-        if (port == 8090) rethrow; // If we've tried all ports, give up
-        continue; // Try next port
-      }
-    }
-  } catch (e) {
-    // If all ports fail, use port 0 for automatic assignment
-    _server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
-    port = _server!.port;
-  }
-
-  // Store server in global variable for cleanup by auto_reload_manager
-
-  // Register server cleanup with the auto reload manager
-  AutoReloadManager.registerCleanupCallback(() async {
-    print('🛑 Closing HTTP server...');
-    await _server?.close(force: true);
-  });
-
-  print('🌐 Server running on: http://localhost:$port');
+  print('🌐 Server running on: http://localhost:8080');
   print('');
   print('Try these endpoints:');
-  print('  • http://localhost:$port/ - Home');
-  print('  • http://localhost:$port/api/time - JSON time endpoint');
-  print('  • http://localhost:$port/api/status - Server status');
+  print('  • http://localhost:8080/ - Home page');
+  print('  • http://localhost:8080/api/time - JSON time endpoint');
+  print('  • http://localhost:8080/api/status - Server status');
+  print('');
+  print('💡 Edit this file and save to see hot reload in action!');
   print('');
 
-  // Handle requests
-  await for (final request in _server!) {
+  // Handle HTTP requests
+  await for (final request in server) {
     await handleRequest(request);
   }
 }
@@ -85,15 +58,12 @@ Future<void> handleRequest(HttpRequest request) async {
       case '/':
         await handleHomePage(response);
         break;
-
       case '/api/time':
         await handleTimeApi(response);
         break;
-
       case '/api/status':
         await handleStatusApi(response);
         break;
-
       default:
         await handle404(response);
     }
@@ -112,7 +82,7 @@ Future<void> handleHomePage(HttpResponse response) async {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Utopia Hot Reload</title>
+    <title>Utopia hot reload</title>
     <style>
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
@@ -131,7 +101,7 @@ Future<void> handleHomePage(HttpResponse response) async {
             padding: 2rem;
             box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
         }
-        h1 { color: #ffd700; text-align: center; }
+        h1 { color: #ffd700; text-align: center; margin-bottom: 2rem; }
         .highlight { 
             background: rgba(255, 215, 0, 0.2);
             padding: 0.2rem 0.4rem;
@@ -152,11 +122,11 @@ Future<void> handleHomePage(HttpResponse response) async {
             background: rgba(255, 255, 255, 0.3);
             transform: translateY(-2px);
         }
-        .reload-info {
+        .info-box {
             background: rgba(0, 0, 0, 0.2);
-            padding: 1rem;
+            padding: 1.5rem;
             border-radius: 8px;
-            margin: 1rem 0;
+            margin: 1.5rem 0;
         }
         code {
             background: rgba(0, 0, 0, 0.3);
@@ -164,17 +134,19 @@ Future<void> handleHomePage(HttpResponse response) async {
             border-radius: 4px;
             font-family: 'Monaco', 'Consolas', monospace;
         }
+        ul, ol { margin: 0.5rem 0; }
+        li { margin: 0.25rem 0; }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>🎉 ALL ISSUES RESOLVED - Perfect Background Operation! 🚀</h1>
+        <h1>🔥 Hot Reload Demo</h1>
         
         <p>Current time: <span class="highlight">${DateTime.now()}</span></p>
-        <p>Server PID: <span class="highlight">$pid</span></p>
+        <p>Server process: <span class="highlight">$pid</span></p>
         
-        <div class="reload-info">
-            <h3>🛠️ Development Commands</h3>
+        <div class="info-box">
+            <h3>⌨️ Development Commands</h3>
             <p>Use these keyboard shortcuts in your terminal:</p>
             <ul>
                 <li><code>r + Enter</code> - Hot reload (preserves state)</li>
@@ -184,21 +156,22 @@ Future<void> handleHomePage(HttpResponse response) async {
         </div>
         
         <h3>🔗 API Endpoints</h3>
-        <p>Try these API endpoints:</p>
+        <p>Try these endpoints to see the server in action:</p>
         <div>
-            <a href="/api/time" class="api-link">📅 /api/time</a>
-            <a href="/api/status" class="api-link">📊 /api/status</a>
+            <a href="/api/time" class="api-link">📅 Current Time</a>
+            <a href="/api/status" class="api-link">📊 Server Status</a>
         </div>
         
-        <div class="reload-info">
-            <h3>🧪 Testing Hot Reload today</h3>
+        <div class="info-box">
+            <h3>🧪 Testing Hot Reload</h3>
             <p>To test hot reload functionality:</p>
             <ol>
-                <li>🎯 This file has been UPDATED! (Hot reload test working!) (<code>example/comprehensive_example.dart</code>)</li>
-                <li>Change some text or styling</li>
+                <li>Edit the file <code>example/example.dart</code></li>
+                <li>Change this text or modify the styling above</li>
                 <li>Save the file</li>
-                <li>Refresh this page to see the latest changes!</li>
+                <li>Refresh this page to see your changes instantly!</li>
             </ol>
+            <p><strong>Note:</strong> Hot reload preserves server state, so your connection stays active!</p>
         </div>
     </div>
     
@@ -236,9 +209,9 @@ Future<void> handleStatusApi(HttpResponse response) async {
   final statusData = {
     'status': 'running',
     'pid': pid,
-    'uptime': 'unknown', // In a real app, you'd track this
-    'memory': 'unknown', // In a real app, you'd check ProcessInfo
-    'dart_version': Platform.version,
+    'uptime': 'available in full implementation',
+    'memory': 'available in full implementation',
+    'dart_version': Platform.version.split(' ')[0],
     'platform': Platform.operatingSystem,
   };
 
@@ -257,14 +230,22 @@ Future<void> handle404(HttpResponse response) async {
 <head>
     <title>404 - Not Found</title>
     <style>
-        body { font-family: Arial, sans-serif; text-align: center; margin-top: 100px; }
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            text-align: center; 
+            margin-top: 100px; 
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            min-height: 100vh;
+        }
         h1 { color: #e74c3c; }
+        a { color: #ffd700; }
     </style>
 </head>
 <body>
     <h1>404 - Page Not Found</h1>
     <p>The page you're looking for doesn't exist.</p>
-    <a href="/">Go back home</a>
+    <a href="/">← Go back home</a>
 </body>
 </html>
   ''');

@@ -8,51 +8,114 @@ import 'file_watcher.dart';
 import 'package:vm_service/vm_service.dart';
 import 'package:vm_service/vm_service_io.dart';
 
-/// Main interface for hot reload/restart functionality.
+/// 🔥 Main developer tools for hot reload functionality
 ///
-/// This replaces the old HttpDev class and works like Flutter's hot reload,
-/// providing a seamless development experience with automatic reloading.
+/// This class provides a Flutter-like development experience for any Dart application.
+/// It automatically handles hot reload (preserving state) and hot restart (full restart)
+/// based on what changes are made to your code.
 ///
-/// The DeveloperTools class provides a single entry point for starting
-/// a development server with hot reload capabilities.
+/// ## Features
+///
+/// - **True Hot Reload**: Uses Dart VM service to reload code while preserving application state
+/// - **Smart Fallback**: Automatically falls back to hot restart when hot reload isn't possible
+/// - **File Watching**: Monitors specified directories for changes with intelligent debouncing
+/// - **Interactive Commands**: Flutter-like keyboard shortcuts (r/R/q)
+/// - **Process Isolation**: Runs your app in a separate process for better stability
+///
+/// ## Example Usage
+///
+/// ```dart
+/// import 'package:utopia_hotreload/utopia_hotreload.dart';
+///
+/// void main() async {
+///   await DeveloperTools.start(
+///     script: runMyApp,
+///     watchPaths: ['lib', 'bin'],
+///     watchExtensions: ['.dart', '.yaml'],
+///   );
+/// }
+///
+/// Future<void> runMyApp() async {
+///   // Your application code here
+///   print('App is running with hot reload!');
+/// }
+/// ```
 class DeveloperTools {
   DeveloperTools._();
 
-  /// Start a development server with auto hot reload/restart (like Flutter).
+  /// Starts a development server with hot reload capabilities.
   ///
-  /// This automatically tries hot reload first, then falls back to hot restart
-  /// if hot reload fails. Just like Flutter's behavior.
+  /// This method sets up file watching, process management, and interactive commands
+  /// to provide a seamless development experience similar to Flutter.
   ///
-  /// **Parameters:**
-  /// - [script]: Your application entry point function
-  /// - [watchPaths]: Directories to watch for changes (default: `['lib']`)
-  /// - [watchExtensions]: File extensions to monitor (default: `['.dart']`)
-  /// - [ignorePatterns]: Patterns to ignore when watching files
-  /// - [debounceDelay]: Delay before triggering reload (default: 500ms)
-  /// - [verbose]: Enable detailed logging (default: false)
+  /// ## Parameters
   ///
-  /// **Example:**
+  /// - **[script]**: The main function of your application. This will be executed
+  ///   in a separate process and can be hot reloaded or restarted.
+  ///
+  /// - **[watchPaths]**: List of directory paths to monitor for changes.
+  ///   Defaults to `['lib']`. Use relative paths from your project root.
+  ///
+  /// - **[watchExtensions]**: File extensions to watch for changes.
+  ///   Defaults to `['.dart']`. Include the dot (e.g., '.dart', '.yaml').
+  ///
+  /// - **[ignorePatterns]**: Patterns to ignore when watching files.
+  ///   Useful for excluding build directories, version control, etc.
+  ///
+  /// - **[debounceDelay]**: Time to wait after a file change before triggering
+  ///   a reload. This prevents excessive reloads during rapid file saves.
+  ///   Defaults to 500ms.
+  ///
+  /// - **[verbose]**: Enable detailed logging for debugging. Shows file events,
+  ///   VM service details, and other diagnostic information. Defaults to false.
+  ///
+  /// ## Interactive Commands
+  ///
+  /// While the development server is running, you can use these commands:
+  ///
+  /// - **`r`** + Enter: Hot reload (preserves application state)
+  /// - **`R`** + Enter: Hot restart (full application restart)
+  /// - **`q`** + Enter: Quit the development server
+  /// - **Ctrl+C**: Force quit the development server
+  ///
+  /// ## Examples
+  ///
+  /// ### Basic Usage
   /// ```dart
-  /// void main() async {
-  ///   await DeveloperTools.start(
-  ///     script: () async {
-  ///       final app = Http(ShelfServer(InternetAddress.anyIPv4, 8080));
-  ///       app.get('/').inject('response').action((Response response) {
-  ///         response.text('Hello with hot reload!');
-  ///         return response;
-  ///       });
-  ///       await app.start();
-  ///     },
-  ///     watchPaths: ['lib', 'example'],
-  ///     watchExtensions: ['.dart'],
-  ///   );
-  /// }
+  /// await DeveloperTools.start(
+  ///   script: () async {
+  ///     print('Hello, hot reload!');
+  ///   },
+  /// );
   /// ```
   ///
-  /// **During development, use:**
-  /// - `r` + Enter: Hot reload (preserves state)
-  /// - `R` + Enter: Hot restart (full restart)
-  /// - `q` + Enter: Quit
+  /// ### HTTP Server Example
+  /// ```dart
+  /// await DeveloperTools.start(
+  ///   script: () async {
+  ///     final server = await HttpServer.bind('localhost', 8080);
+  ///     await for (final request in server) {
+  ///       request.response
+  ///         ..write('Hello from hot reload! ${DateTime.now()}')
+  ///         ..close();
+  ///     }
+  ///   },
+  ///   watchPaths: ['lib', 'web'],
+  ///   verbose: true,
+  /// );
+  /// ```
+  ///
+  /// ### Custom Configuration
+  /// ```dart
+  /// await DeveloperTools.start(
+  ///   script: runMyComplexApp,
+  ///   watchPaths: ['lib', 'bin', 'config'],
+  ///   watchExtensions: ['.dart', '.yaml', '.json'],
+  ///   ignorePatterns: ['.git/', 'build/', 'temp/'],
+  ///   debounceDelay: Duration(milliseconds: 200),
+  ///   verbose: false,
+  /// );
+  /// ```
   static Future<void> start({
     required Future<void> Function() script,
     List<String> watchPaths = const ['lib'],

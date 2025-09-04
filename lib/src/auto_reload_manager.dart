@@ -26,7 +26,7 @@ class AutoReloadManager {
   bool _vmServiceEnabled = false;
 
   // Application cleanup callbacks
-  static List<Future<void> Function()> _cleanupCallbacks = [];
+  static final List<Function()> _cleanupCallbacks = [];
 
   /// Register a cleanup callback that will be called on shutdown
   static void registerCleanupCallback(Future<void> Function() callback) {
