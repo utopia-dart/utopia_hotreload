@@ -59,7 +59,7 @@ jobs:
         run: dart pub get
 
       - name: Run unit tests
-        run: dart test test/ --reporter expanded --timeout=2m
+        run: dart test test/unit --reporter expanded --timeout=2m
 
       - name: Run file watcher E2E tests
         run: dart test test/e2e/file_watcher_e2e_test.dart --reporter expanded --timeout=5m
