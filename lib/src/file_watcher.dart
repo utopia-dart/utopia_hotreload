@@ -132,7 +132,8 @@ class HotReloadFileWatcher {
       final absoluteWatchPath = path.normalize(path.absolute(watchPath));
       final normalizedFilePath = path.normalize(filePath);
 
-      if (normalizedFilePath.startsWith(absoluteWatchPath)) {
+      // Use path.isWithin for robust cross-platform matching
+      if (path.isWithin(absoluteWatchPath, normalizedFilePath)) {
         return path.relative(normalizedFilePath, from: absoluteWatchPath);
       }
     }
