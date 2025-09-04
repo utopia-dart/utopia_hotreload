@@ -47,6 +47,11 @@ class HotReloadFileWatcher {
             return;
           }
 
+          // Debug: Print what got through the filters
+          if (config.verbose) {
+            print('✅ File passed filters: ${_getRelativePath(filePath)}');
+          }
+
           // Debounce file changes
           _debounceTimer?.cancel();
           _debounceTimer = Timer(config.debounceDelay, () {
@@ -127,18 +132,34 @@ class HotReloadFileWatcher {
 
   /// Get relative path from the watch paths (for ignore pattern matching)
   String _getRelativePathFromWatchPaths(String filePath) {
+    // Normalize the file path
+    final normalizedFilePath = path.normalize(path.absolute(filePath));
+
     // Try to find the relative path from any of the watch paths
     for (final watchPath in config.watchPaths) {
-      final absoluteWatchPath = path.normalize(path.absolute(watchPath));
-      final normalizedFilePath = path.normalize(filePath);
+      final normalizedWatchPath = path.normalize(path.absolute(watchPath));
 
-      // Use path.isWithin for robust cross-platform matching
-      if (path.isWithin(absoluteWatchPath, normalizedFilePath)) {
-        return path.relative(normalizedFilePath, from: absoluteWatchPath);
+      // Check if the file is within this watch path
+      if (normalizedFilePath.startsWith(normalizedWatchPath + path.separator) ||
+          normalizedFilePath == normalizedWatchPath) {
+        // Calculate relative path
+        final relativePath =
+            normalizedFilePath.substring(normalizedWatchPath.length);
+        // Remove leading separator if present
+        if (relativePath.startsWith(path.separator)) {
+          return relativePath.substring(1);
+        }
+        return relativePath;
       }
     }
-    // Fallback to the original relative path method
-    return _getRelativePath(filePath);
+
+    // Fallback: try to get relative path from current directory
+    try {
+      return path.relative(normalizedFilePath);
+    } catch (e) {
+      // Last resort: return just the filename
+      return path.basename(filePath);
+    }
   }
 
   /// Get relative path for display
