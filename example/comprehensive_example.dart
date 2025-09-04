@@ -23,6 +23,9 @@ void main() async {
   );
 }
 
+// Global server reference for cleanup
+HttpServer? _server;
+
 /// Main application logic
 Future<void> runApplication() async {
   print('📊 Application starting...');
@@ -31,14 +34,13 @@ Future<void> runApplication() async {
   print('');
 
   // Create a simple HTTP server with dynamic port allocation
-  late HttpServer server;
   int port = 8080;
 
   try {
     // Try multiple ports starting from 8080
     for (port = 8080; port <= 8090; port++) {
       try {
-        server = await HttpServer.bind(InternetAddress.loopbackIPv4, port);
+        _server = await HttpServer.bind(InternetAddress.loopbackIPv4, port);
         break;
       } catch (e) {
         if (port == 8090) rethrow; // If we've tried all ports, give up
@@ -47,20 +49,28 @@ Future<void> runApplication() async {
     }
   } catch (e) {
     // If all ports fail, use port 0 for automatic assignment
-    server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
-    port = server.port;
+    _server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+    port = _server!.port;
   }
+
+  // Store server in global variable for cleanup by auto_reload_manager
+
+  // Register server cleanup with the auto reload manager
+  AutoReloadManager.registerCleanupCallback(() async {
+    print('🛑 Closing HTTP server...');
+    await _server?.close(force: true);
+  });
 
   print('🌐 Server running on: http://localhost:$port');
   print('');
   print('Try these endpoints:');
-  print('  • http://localhost:$port/ - Main page');
+  print('  • http://localhost:$port/ - Home');
   print('  • http://localhost:$port/api/time - JSON time endpoint');
   print('  • http://localhost:$port/api/status - Server status');
   print('');
 
   // Handle requests
-  await for (final request in server) {
+  await for (final request in _server!) {
     await handleRequest(request);
   }
 }
@@ -102,7 +112,7 @@ Future<void> handleHomePage(HttpResponse response) async {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Utopia Hot Reload Demo</title>
+    <title>Utopia Hot Reload</title>
     <style>
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
@@ -158,7 +168,7 @@ Future<void> handleHomePage(HttpResponse response) async {
 </head>
 <body>
     <div class="container">
-        <h1>🔥 Utopia Hot Reload Demo</h1>
+        <h1>🎉 ALL ISSUES RESOLVED - Perfect Background Operation! 🚀</h1>
         
         <p>Current time: <span class="highlight">${DateTime.now()}</span></p>
         <p>Server PID: <span class="highlight">$pid</span></p>
@@ -181,10 +191,10 @@ Future<void> handleHomePage(HttpResponse response) async {
         </div>
         
         <div class="reload-info">
-            <h3>🧪 Testing Hot Reload</h3>
+            <h3>🧪 Testing Hot Reload today</h3>
             <p>To test hot reload functionality:</p>
             <ol>
-                <li>Okay this is edited (<code>example/comprehensive_example.dart</code>)</li>
+                <li>🎯 This file has been UPDATED! (Hot reload test working!) (<code>example/comprehensive_example.dart</code>)</li>
                 <li>Change some text or styling</li>
                 <li>Save the file</li>
                 <li>Refresh this page to see the latest changes!</li>
@@ -194,7 +204,7 @@ Future<void> handleHomePage(HttpResponse response) async {
     
     <script>
         // Auto-refresh every 5 seconds to show live updates
-        setTimeout(() => location.reload(), 5000);
+        setTimeout(() => location.reload(), 1000);
     </script>
 </body>
 </html>

@@ -25,6 +25,14 @@ class AutoReloadManager {
   String? _isolateId;
   bool _vmServiceEnabled = false;
 
+  // Application cleanup callbacks
+  static List<Future<void> Function()> _cleanupCallbacks = [];
+
+  /// Register a cleanup callback that will be called on shutdown
+  static void registerCleanupCallback(Future<void> Function() callback) {
+    _cleanupCallbacks.add(callback);
+  }
+
   AutoReloadManager({
     required this.script,
     required this.config,
@@ -53,52 +61,117 @@ class AutoReloadManager {
     // Try to enable VM service for true hot reload
     await _initializeVmService();
 
-    // Set up keyboard commands BEFORE starting the application
-    print('🎮 Keyboard input enabled...');
+    // Set up non-interactive background keyboard commands
+    print('🎮 Background keyboard input enabled...');
+    print('💡 Press: r (reload), R (restart), q (quit), or Ctrl+C');
 
-    try {
-      stdin.echoMode = false;
-      stdin.lineMode = true; // Keep line mode for Windows compatibility
-    } catch (e) {
-      // Windows might not support this, continue anyway
-      if (config.verbose) {
-        print('⚠️  Could not set stdin mode: $e');
+    // Safe background stdin setup - avoid crashes on cleanup
+    bool rawMode = false;
+
+    // Try raw mode: single-keystroke, no echo, non-blocking (all platforms; fallback on error)
+    if (stdin.hasTerminal) {
+      try {
+        stdin.echoMode = false;
+        stdin.lineMode = false;
+        rawMode = true;
+      } catch (e) {
+        // Terminal may not support raw mode (e.g., some Windows shells/CI)
+        rawMode = false;
       }
     }
 
-    _stdinSubscription = stdin
-        .transform(utf8.decoder)
-        .transform(const LineSplitter())
-        .listen((line) {
-      final command = line.trim().toLowerCase();
-      switch (command) {
-        case 'r':
-          print('🔥 Manual hot reload triggered...');
-          _performHotReload();
-          break;
-        case 'R':
-          print('🔄 Manual hot restart triggered...');
-          _performHotRestart();
-          break;
-        case 'q':
-          print('👋 Shutting down...');
-          _shutdown();
-          break;
-        default:
-          if (command.isNotEmpty && config.verbose) {
-            print('ℹ️  Unknown command: $command (use r/R/q)');
+    // Background stdin listener (does not block main application)
+    if (rawMode) {
+      _stdinSubscription = stdin.listen((data) {
+        for (final byte in data) {
+          final char = String.fromCharCode(byte);
+          // Handle Ctrl+C (ETX) when in raw mode
+          if (byte == 3) {
+            print('\n🛑 Ctrl+C detected - shutting down development server...');
+            _shutdown();
+            return;
           }
-      }
-    }, onError: (error) {
-      if (config.verbose) {
-        print('⚠️  Stdin error: $error');
-      }
-    }); // Handle Ctrl+C gracefully
+          switch (char) {
+            case 'r':
+              print('\n🔥 Manual hot reload triggered...');
+              _performHotReload();
+              break;
+            case 'R':
+              print('\n🔄 Manual hot restart triggered...');
+              _performHotRestart();
+              break;
+            case 'q':
+            case 'Q':
+              print('\n👋 Shutting down via keyboard command...');
+              _shutdown();
+              return;
+          }
+        }
+      }, onError: (error) {
+        // Silently handle stdin errors
+      }, cancelOnError: false);
+    } else {
+      // Fallback to line-based mode for terminals that don't support raw mode
+      _stdinSubscription = stdin
+          .transform(utf8.decoder)
+          .transform(const LineSplitter())
+          .listen((line) {
+        final command = line.trim();
+        switch (command) {
+          case 'r':
+            print('🔥 Manual hot reload triggered...');
+            _performHotReload();
+            break;
+          case 'R':
+            print('🔄 Manual hot restart triggered...');
+            _performHotRestart();
+            break;
+          case 'q':
+          case 'Q':
+          case 'quit':
+          case 'exit':
+            print('👋 Shutting down via keyboard command...');
+            _shutdown();
+            break;
+          default:
+            switch (command.toLowerCase()) {
+              case 'r':
+                print('🔥 Manual hot reload triggered...');
+                _performHotReload();
+                break;
+              case 'q':
+              case 'quit':
+              case 'exit':
+                print('👋 Shutting down via keyboard command...');
+                _shutdown();
+                break;
+            }
+        }
+      }, onError: (error) {
+        // Silently handle stdin errors
+      }, cancelOnError: false);
+    }
+
+    // Handle Ctrl+C gracefully with immediate shutdown
     ProcessSignal.sigint.watch().listen((signal) async {
-      print('\\n🛑 Shutting down development server...');
+      print('\n🛑 Ctrl+C detected - shutting down development server...');
       await _shutdown();
+      // Force exit if shutdown doesn't work
       exit(0);
     });
+
+    // Also handle SIGTERM to ensure cleanup on termination (skip on Windows)
+    try {
+      if (!Platform.isWindows) {
+        ProcessSignal.sigterm.watch().listen((signal) async {
+          print('\n🛑 SIGTERM received - shutting down development server...');
+          await _shutdown();
+          exit(0);
+        });
+      }
+    } catch (_) {
+      // Platform may not support SIGTERM; ignore
+    }
 
     // Start the application AFTER setting up watchers
     await _startApplication();
@@ -265,19 +338,50 @@ class AutoReloadManager {
   Future<void> _shutdown() async {
     print('🛑 Shutting down development server...');
 
+    // Cancel subscriptions first
     await _fileSubscription?.cancel();
     await _stdinSubscription?.cancel();
     await _fileWatcher.stop();
 
+    // Safely restore terminal settings before any other cleanup (skip on Windows to avoid VM crash)
+    if (!Platform.isWindows) {
+      try {
+        if (stdin.hasTerminal) {
+          stdin.echoMode = true;
+          stdin.lineMode = true;
+        }
+      } catch (e) {
+        // Ignore terminal restoration errors to avoid crashes
+      }
+    }
+
+    // Call application cleanup callbacks
+    for (final callback in _cleanupCallbacks) {
+      try {
+        await callback();
+      } catch (e) {
+        print('⚠️  Cleanup callback error: $e');
+      }
+    }
+
     // Clean up VM service connection
     if (_vmService != null) {
-      await _vmService!.dispose();
+      try {
+        await _vmService!.dispose();
+      } catch (e) {
+        // Ignore VM service cleanup errors
+      }
     }
 
     if (_currentProcess != null) {
       print('   Stopping child process...');
       _currentProcess!.kill();
-      await _currentProcess!.exitCode;
+      try {
+        await _currentProcess!.exitCode.timeout(Duration(seconds: 2));
+      } catch (e) {
+        // Force kill if it doesn't stop gracefully
+        _currentProcess!.kill(ProcessSignal.sigkill);
+      }
     }
 
     print('✅ Development server stopped');

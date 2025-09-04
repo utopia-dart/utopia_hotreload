@@ -83,16 +83,18 @@ class HotReloadManager {
         scriptPath,
       ];
 
-      final process = await Process.start(Platform.executable, args);
+      final process = await Process.start(
+        Platform.executable,
+        args,
+        mode: ProcessStartMode
+            .inheritStdio, // inherit terminal IO for stdin/sigint
+      );
 
-      // Forward stdout and stderr
-      process.stdout.listen((data) {
-        stdout.add(data);
-      });
-
-      process.stderr.listen((data) {
-        stderr.add(data);
-      });
+      // With inheritStdio, output is already connected; ignore if streams not accessible
+      try {
+        process.stdout.listen((data) => stdout.add(data));
+        process.stderr.listen((data) => stderr.add(data));
+      } catch (_) {}
 
       final exitCode = await process.exitCode;
       exit(exitCode);
