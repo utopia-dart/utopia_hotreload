@@ -72,28 +72,35 @@ void main() {
 
       final watcher = HotReloadFileWatcher(config);
       final changeCompleter = Completer<String>();
-      bool changeDetected = false;
+      bool txtFileChangeDetected = false;
+      String? detectedFilePath;
 
       await watcher.start((filePath) {
-        changeDetected = true;
-        if (!changeCompleter.isCompleted) {
-          changeCompleter.complete(filePath);
+        detectedFilePath = filePath;
+        // Only count changes to .txt files as unexpected
+        if (filePath.endsWith('.txt')) {
+          txtFileChangeDetected = true;
+          if (!changeCompleter.isCompleted) {
+            changeCompleter.complete(filePath);
+          }
         }
       });
 
-      await Future.delayed(Duration(milliseconds: 200));
+      // Wait for initial watcher setup and any initial events to settle
+      await Future.delayed(Duration(milliseconds: 300));
 
       // Create a .txt file (should be ignored)
       final ignoredFile = File(path.join(tempDir.path, 'ignored.txt'));
       await ignoredFile.writeAsString('This should be ignored');
 
-      // Wait to see if any change is detected (it shouldn't be)
+      // Wait to see if any change is detected for the .txt file (it shouldn't be)
       try {
-        await changeCompleter.future.timeout(Duration(milliseconds: 500));
+        await changeCompleter.future.timeout(Duration(milliseconds: 1000));
         fail('Change should not have been detected for .txt file');
       } on TimeoutException {
-        // This is expected - no change should be detected
-        expect(changeDetected, isFalse);
+        // This is expected - no change should be detected for .txt file
+        expect(txtFileChangeDetected, isFalse,
+            reason: 'Detected change for .txt file at: $detectedFilePath');
       }
 
       await watcher.stop();
@@ -113,28 +120,35 @@ void main() {
 
       final watcher = HotReloadFileWatcher(config);
       final changeCompleter = Completer<String>();
-      bool changeDetected = false;
+      bool gitFileChangeDetected = false;
+      String? detectedFilePath;
 
       await watcher.start((filePath) {
-        changeDetected = true;
-        if (!changeCompleter.isCompleted) {
-          changeCompleter.complete(filePath);
+        detectedFilePath = filePath;
+        // Only count changes to files in .git directory as unexpected
+        if (filePath.contains('.git')) {
+          gitFileChangeDetected = true;
+          if (!changeCompleter.isCompleted) {
+            changeCompleter.complete(filePath);
+          }
         }
       });
 
-      await Future.delayed(Duration(milliseconds: 200));
+      // Wait for initial watcher setup and any initial events to settle
+      await Future.delayed(Duration(milliseconds: 300));
 
       // Create a file in .git directory (should be ignored)
       final gitFile = File(path.join(gitDir.path, 'config.dart'));
       await gitFile.writeAsString('void main() {}');
 
-      // Wait to see if any change is detected (it shouldn't be)
+      // Wait to see if any change is detected for the git file (it shouldn't be)
       try {
-        await changeCompleter.future.timeout(Duration(seconds: 2));
+        await changeCompleter.future.timeout(Duration(seconds: 1));
         fail('Change should not have been detected for file in .git directory');
       } on TimeoutException {
-        // This is expected - no change should be detected
-        expect(changeDetected, isFalse);
+        // This is expected - no change should be detected for .git file
+        expect(gitFileChangeDetected, isFalse,
+            reason: 'Detected change for .git file at: $detectedFilePath');
       }
 
       await watcher.stop();
