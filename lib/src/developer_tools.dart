@@ -193,9 +193,9 @@ class DeveloperTools {
     }
 
     print('🔥 Hot reload enabled. Press:');
-    print('  r + Enter: Hot reload');
-    print('  R + Enter: Hot restart');
-    print('  q + Enter: Quit');
+    print('  r: Hot reload');
+    print('  R: Hot restart');
+    print('  q: Quit');
     print('');
 
     final devServer = _DevelopmentServer(config: config);
@@ -405,9 +405,9 @@ class _DevelopmentServer {
     print('📄 Watching extensions: ${config.watchExtensions}');
     print('');
     print('💡 Commands available:');
-    print('  r + Enter: Hot reload (preserves state)');
-    print('  R + Enter: Hot restart (full restart)');
-    print('  q + Enter: Quit');
+    print('  r: Hot reload (preserves state)');
+    print('  R: Hot restart (full restart)');
+    print('  q: Quit');
     print('');
 
     await _setupFileWatcher();
@@ -667,7 +667,10 @@ class _DevelopmentServer {
   Future<void> _shutdown() async {
     if (_isShuttingDown) return;
     _isShuttingDown = true;
-    print('🛑 Shutting down development server...');
+    print('[STOP] Shutting down development server...');
+
+    // Mark keyboard handler as shutting down to prevent Windows VM crashes
+    KeyboardInputHandler.markShuttingDown();
 
     // Stop keyboard input handler (handles terminal restoration)
     await _keyboardHandler?.stop();
@@ -676,7 +679,7 @@ class _DevelopmentServer {
     await _fileWatcher.stop();
     await _killUserProcess();
 
-    print('✅ Development server stopped');
+    print('Development server stopped');
     exit(0);
   }
 

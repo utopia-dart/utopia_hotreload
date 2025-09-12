@@ -37,13 +37,9 @@ utopia_hotreload/
 │       ├── auto_reload_manager.dart # VM service integration
 │       ├── developer_tools.dart    # Public API
 │       ├── file_watcher.dart      # File system monitoring
-│       ├── hot_reload_manager.dart # Hot reload logic
-│       ├── hot_restart_manager.dart # Hot restart logic
 │       └── reload_config.dart       # Configuration types
 ├── example/
 │   └── example.dart               # Usage examples
-├── test/
-│   └── utopia_hotreload_test.dart # Unit tests
 ├── CHANGELOG.md                   # Version history
 └── README.md                      # Documentation
 ```
