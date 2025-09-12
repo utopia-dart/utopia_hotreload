@@ -8,6 +8,7 @@ import 'file_watcher.dart';
 import 'service_config.dart';
 import 'multi_service_manager.dart';
 import 'keyboard_input_handler.dart';
+import 'file_pattern_matcher.dart';
 import 'package:vm_service/vm_service.dart';
 import 'package:vm_service/vm_service_io.dart';
 
@@ -120,6 +121,19 @@ class DeveloperTools {
   ///   verbose: false,
   /// );
   /// ```
+  ///
+  /// ### Advanced Pattern Matching
+  /// ```dart
+  /// await DeveloperTools.start(
+  ///   script: runMyApp,
+  ///   watchPaths: ['lib', 'web'],
+  ///   patternPresets: ['dart-project', 'web-project'],
+  ///   customPatterns: [
+  ///     FilePattern.include('**/*.env'),
+  ///     FilePattern.exclude('lib/generated/**'),
+  ///   ],
+  /// );
+  /// ```
   static Future<void> start({
     required Future<void> Function() script,
     List<String> watchPaths = const ['lib'],
@@ -130,6 +144,9 @@ class DeveloperTools {
       'build/',
       'pubspec.lock',
     ],
+    List<String> patternPresets = const [],
+    List<FilePattern> customPatterns = const [],
+    FilePatternMatcher? patternMatcher,
     Duration debounceDelay = const Duration(milliseconds: 500),
     bool verbose = false,
     int? childVmServicePort,
@@ -141,15 +158,39 @@ class DeveloperTools {
 
     await _ensureVmServiceEnabled();
 
-    final config = ReloadConfig(
-      mode: ReloadMode.auto,
-      watchPaths: watchPaths,
-      watchExtensions: watchExtensions,
-      ignorePatterns: ignorePatterns,
-      debounceDelay: debounceDelay,
-      verbose: verbose,
-      childVmServicePort: childVmServicePort,
-    );
+    // Create configuration based on what's provided
+    late final ReloadConfig config;
+
+    if (patternMatcher != null) {
+      config = ReloadConfig.withMatcher(
+        mode: ReloadMode.auto,
+        watchPaths: watchPaths,
+        patternMatcher: patternMatcher,
+        debounceDelay: debounceDelay,
+        verbose: verbose,
+        childVmServicePort: childVmServicePort,
+      );
+    } else if (patternPresets.isNotEmpty || customPatterns.isNotEmpty) {
+      config = ReloadConfig.withPatterns(
+        mode: ReloadMode.auto,
+        watchPaths: watchPaths,
+        presets: patternPresets,
+        patterns: customPatterns,
+        debounceDelay: debounceDelay,
+        verbose: verbose,
+        childVmServicePort: childVmServicePort,
+      );
+    } else {
+      config = ReloadConfig(
+        mode: ReloadMode.auto,
+        watchPaths: watchPaths,
+        watchExtensions: watchExtensions,
+        ignorePatterns: ignorePatterns,
+        debounceDelay: debounceDelay,
+        verbose: verbose,
+        childVmServicePort: childVmServicePort,
+      );
+    }
 
     print('🔥 Hot reload enabled. Press:');
     print('  r + Enter: Hot reload');
@@ -204,6 +245,25 @@ class DeveloperTools {
   /// ]);
   /// ```
   ///
+  /// ## Advanced Pattern Matching
+  /// ```dart
+  /// await DeveloperTools.startMultiple([
+  ///   ServiceConfig.withPatterns(
+  ///     name: 'api',
+  ///     script: runApi,
+  ///     presets: ['dart-project'],
+  ///   ),
+  ///   ServiceConfig.withPatterns(
+  ///     name: 'web',
+  ///     script: runWeb,
+  ///     presets: ['web-project'],
+  ///   ),
+  /// ],
+  /// globalPatternPresets: ['dart-project'],
+  /// globalCustomPatterns: [FilePattern.exclude('**/*.log')],
+  /// );
+  /// ```
+  ///
   /// ## Interactive Commands
   ///
   /// While running, use these commands:
@@ -225,6 +285,9 @@ class DeveloperTools {
       'build/',
       'pubspec.lock',
     ],
+    List<String> globalPatternPresets = const [],
+    List<FilePattern> globalCustomPatterns = const [],
+    FilePatternMatcher? globalPatternMatcher,
     Duration debounceDelay = const Duration(milliseconds: 500),
     bool verbose = false,
     bool interactive = true,
@@ -235,14 +298,37 @@ class DeveloperTools {
 
     await _ensureVmServiceEnabled();
 
-    final globalConfig = ReloadConfig(
-      mode: ReloadMode.auto,
-      watchPaths: globalWatchPaths,
-      watchExtensions: globalWatchExtensions,
-      ignorePatterns: globalIgnorePatterns,
-      debounceDelay: debounceDelay,
-      verbose: verbose,
-    );
+    // Create global configuration based on what's provided
+    late final ReloadConfig globalConfig;
+
+    if (globalPatternMatcher != null) {
+      globalConfig = ReloadConfig.withMatcher(
+        mode: ReloadMode.auto,
+        watchPaths: globalWatchPaths,
+        patternMatcher: globalPatternMatcher,
+        debounceDelay: debounceDelay,
+        verbose: verbose,
+      );
+    } else if (globalPatternPresets.isNotEmpty ||
+        globalCustomPatterns.isNotEmpty) {
+      globalConfig = ReloadConfig.withPatterns(
+        mode: ReloadMode.auto,
+        watchPaths: globalWatchPaths,
+        presets: globalPatternPresets,
+        patterns: globalCustomPatterns,
+        debounceDelay: debounceDelay,
+        verbose: verbose,
+      );
+    } else {
+      globalConfig = ReloadConfig(
+        mode: ReloadMode.auto,
+        watchPaths: globalWatchPaths,
+        watchExtensions: globalWatchExtensions,
+        ignorePatterns: globalIgnorePatterns,
+        debounceDelay: debounceDelay,
+        verbose: verbose,
+      );
+    }
 
     final manager = MultiServiceManager(services, globalConfig);
     await manager.startAll(interactive: interactive);
