@@ -491,6 +491,9 @@ class _DevelopmentServer {
         port: config.dashboardPort,
       );
 
+      // Attach the file watcher to the dashboard
+      _dashboard!.attachFileWatcher(_fileWatcher);
+
       await _dashboard!.start();
       print(
           '📊 Dashboard started at: http://localhost:${config.dashboardPort}');

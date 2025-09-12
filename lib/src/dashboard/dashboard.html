@@ -430,7 +430,7 @@
                 this.updateSystemOverview(data);
                 this.updateServices(data.services || []);
                 this.updatePerformanceMetrics(data.metrics || {});
-                this.updateWatchedFiles(data.metrics?.serviceMetrics?.watchedFiles || {});
+                this.updateWatchedFiles(data.watchedFiles || {});
                 this.updateReloadHistory(data.reloadHistory || []);
             }
 
@@ -484,12 +484,13 @@
             }
 
             updateWatchedFiles(watchedFiles) {
-                document.getElementById('totalWatchers').textContent =
-                    watchedFiles.totalWatchers || 0;
-                document.getElementById('totalWatchPaths').textContent =
-                    watchedFiles.totalWatchPaths || 0;
-                document.getElementById('totalPatterns').textContent =
-                    watchedFiles.totalPatterns || 0;
+                const totalWatchPaths = watchedFiles?.watchPaths?.length || 0;
+                const totalExtensions = watchedFiles?.watchExtensions?.length || 0;
+                const totalIgnorePatterns = watchedFiles?.ignorePatterns?.length || 0;
+
+                document.getElementById('totalWatchers').textContent = watchedFiles?.isActive ? '1' : '0';
+                document.getElementById('totalWatchPaths').textContent = totalWatchPaths;
+                document.getElementById('totalPatterns').textContent = totalExtensions + totalIgnorePatterns;
 
                 // Store watched files data for details view
                 this.watchedFilesData = watchedFiles;
@@ -518,27 +519,39 @@
                 const container = document.getElementById('watchedFilesDetails');
                 const data = this.watchedFilesData || {};
 
-                let html = '<div style="margin-bottom: 10px;"><strong>Services:</strong></div>';
+                let html = '<div style="margin-bottom: 10px;"><strong>File Watcher Configuration:</strong></div>';
 
-                (data.services || []).forEach(service => {
-                    const activeStatus = service.isActive ? '🟢' : '🔴';
-                    html += `
-                        <div style="margin-bottom: 8px; padding: 5px; background: rgba(255,255,255,0.05); border-radius: 3px;">
-                            <div><strong>${activeStatus} ${service.serviceName}</strong></div>
-                            <div style="margin-left: 15px; color: #888;">
-                                Watch Paths: ${service.watchPaths.length}<br>
-                                Patterns: ${service.matcher.patternCount}<br>
-                                Include: ${service.matcher.includePatterns}, Exclude: ${service.matcher.excludePatterns}
-                            </div>
+                const activeStatus = data.isActive ? '🟢' : '🔴';
+                html += `
+                    <div style="margin-bottom: 8px; padding: 5px; background: rgba(255,255,255,0.05); border-radius: 3px;">
+                        <div><strong>${activeStatus} File Watcher ${data.isActive ? 'Active' : 'Inactive'}</strong></div>
+                        <div style="margin-left: 15px; color: #888;">
+                            <strong>Watch Paths:</strong> ${(data.watchPaths || []).join(', ')}<br>
+                            <strong>Extensions:</strong> ${(data.watchExtensions || []).join(', ')}<br>
+                            <strong>Debounce:</strong> ${data.debounceMs || 0}ms<br>
+                            <strong>Verbose:</strong> ${data.verbose ? 'Yes' : 'No'}
                         </div>
-                    `;
-                });
+                    </div>
+                `;
 
-                if (data.summary && Object.keys(data.summary).length > 0) {
-                    html += '<div style="margin-top: 10px;"><strong>File Types:</strong></div>';
+                if (data.ignorePatterns && data.ignorePatterns.length > 0) {
+                    html += '<div style="margin-top: 10px;"><strong>Ignore Patterns:</strong></div>';
                     html += '<div style="margin-left: 15px; color: #888;">';
-                    for (const [ext, count] of Object.entries(data.summary)) {
-                        html += `.${ext}: ${count} files<br>`;
+                    data.ignorePatterns.forEach(pattern => {
+                        html += `${pattern}<br>`;
+                    });
+                    html += '</div>';
+                }
+
+                if (data.matcherInfo && Object.keys(data.matcherInfo).length > 0) {
+                    html += '<div style="margin-top: 10px;"><strong>Pattern Matcher:</strong></div>';
+                    html += '<div style="margin-left: 15px; color: #888;">';
+                    const matcherInfo = data.matcherInfo;
+                    html += `Include Patterns: ${matcherInfo.includePatterns || 0}<br>`;
+                    html += `Exclude Patterns: ${matcherInfo.excludePatterns || 0}<br>`;
+                    html += `Total Patterns: ${matcherInfo.totalPatterns || 0}<br>`;
+                    if (matcherInfo.presets && matcherInfo.presets.length > 0) {
+                        html += `Presets: ${matcherInfo.presets.join(', ')}<br>`;
                     }
                     html += '</div>';
                 }

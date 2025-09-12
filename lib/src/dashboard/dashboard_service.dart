@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import '../multi_service_manager.dart';
+import '../file_watcher.dart';
 import 'metrics_collector.dart';
 import 'reload_history.dart';
 import 'package:path/path.dart' as path;
@@ -26,6 +27,7 @@ class DashboardService {
   late ReloadHistory _reloadHistory;
 
   MultiServiceManager? _serviceManager;
+  HotReloadFileWatcher? _fileWatcher;
   bool _isRunning = false;
 
   final List<WebSocket> _connectedClients = [];
@@ -84,6 +86,11 @@ class DashboardService {
     _metricsCollector.attachServiceManager(manager);
   }
 
+  /// Attaches a file watcher for monitoring watched files.
+  void attachFileWatcher(HotReloadFileWatcher fileWatcher) {
+    _fileWatcher = fileWatcher;
+  }
+
   /// Records a hot reload event for tracking and analytics.
   void recordReloadEvent({
     required String serviceName,
@@ -126,6 +133,9 @@ class DashboardService {
           break;
         case '/api/services':
           await _serveApiServices(request.response);
+          break;
+        case '/api/watched-files':
+          await _serveApiWatchedFiles(request.response);
           break;
         case '/api/services/restart':
           await _handleServiceRestart(request);
@@ -230,6 +240,7 @@ class DashboardService {
       'metrics': await _metricsCollector.collectMetrics(),
       'reloadHistory': _reloadHistory.getRecentEvents(limit: 50),
       'systemInfo': await _collectSystemInfo(),
+      'watchedFiles': _fileWatcher?.getWatchInfo(),
     };
 
     return data;
@@ -297,6 +308,25 @@ class DashboardService {
     await response.close();
   }
 
+  Future<void> _serveApiWatchedFiles(HttpResponse response) async {
+    response.headers.contentType = ContentType.json;
+    response.headers.add('Access-Control-Allow-Origin', '*');
+
+    final watchInfo = _fileWatcher?.getWatchInfo() ??
+        {
+          'watchPaths': [],
+          'watchExtensions': [],
+          'ignorePatterns': [],
+          'isActive': false,
+          'matcherInfo': {},
+          'debounceMs': 0,
+          'verbose': false,
+        };
+
+    response.write(jsonEncode(watchInfo));
+    await response.close();
+  }
+
   Future<void> _handleServiceRestart(HttpRequest request) async {
     final body = await utf8.decodeStream(request);
     final data = jsonDecode(body);
@@ -357,20 +387,27 @@ class DashboardService {
 
   Future<String> _generateDashboardHtml() async {
     try {
-      // Get the directory of this file to locate the HTML template
-      final packageRoot = path
-          .dirname(path.dirname(path.dirname(Platform.script.toFilePath())));
-      final htmlFile = File(
-          path.join(packageRoot, 'lib', 'src', 'dashboard', 'dashboard.html'));
+      // Try multiple possible locations for the HTML template
+      final possiblePaths = [
+        // Direct path when running from package
+        path.join('lib', 'src', 'dashboard', 'dashboard.html'),
+        // Path when running from example directory
+        path.join('..', 'lib', 'src', 'dashboard', 'dashboard.html'),
+        // Absolute path approach
+        path.join(Directory.current.path, 'lib', 'src', 'dashboard',
+            'dashboard.html'),
+      ];
 
-      if (await htmlFile.exists()) {
-        return await htmlFile.readAsString();
-      } else {
-        // Fallback to embedded HTML if file not found
-        print(
-            '⚠️  Dashboard HTML file not found at ${htmlFile.path}, using fallback');
-        return _getFallbackHtml();
+      for (final htmlPath in possiblePaths) {
+        final htmlFile = File(htmlPath);
+        if (await htmlFile.exists()) {
+          return await htmlFile.readAsString();
+        }
       }
+
+      // Fallback to embedded HTML if file not found
+      print('⚠️  Dashboard HTML file not found, using fallback');
+      return _getFallbackHtml();
     } catch (e) {
       print('⚠️  Error loading dashboard HTML: $e, using fallback');
       return _getFallbackHtml();
