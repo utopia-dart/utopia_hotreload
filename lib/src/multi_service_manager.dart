@@ -485,6 +485,51 @@ Future<void> runServiceScript() async {
       };
     }).toList();
   }
+
+  /// Gets comprehensive information about all watched files across all services.
+  Map<String, dynamic> getAllWatchedFiles() {
+    final result = <String, dynamic>{
+      'services': <Map<String, dynamic>>[],
+      'totalWatchers': _watchers.length,
+      'totalWatchPaths': 0,
+      'totalPatterns': 0,
+      'summary': <String, int>{},
+    };
+
+    final allWatchPaths = <String>{};
+    var totalPatterns = 0;
+
+    for (final entry in _watchers.entries) {
+      final serviceName = entry.key;
+      final watcher = entry.value;
+      final watchInfo = watcher.getWatchInfo();
+
+      allWatchPaths.addAll(watchInfo['watchPaths'] as List<String>);
+      totalPatterns += watchInfo['matcherInfo']['patternCount'] as int;
+
+      result['services'].add({
+        'serviceName': serviceName,
+        'isActive': watchInfo['isActive'],
+        'watchPaths': watchInfo['watchPaths'],
+        'debounceMs': watchInfo['debounceMs'],
+        'matcher': watchInfo['matcherInfo'],
+      });
+    }
+
+    result['totalWatchPaths'] = allWatchPaths.length;
+    result['totalPatterns'] = totalPatterns;
+    result['uniqueWatchPaths'] = allWatchPaths.toList()..sort();
+
+    // Create summary by file extension
+    final extensionCounts = <String, int>{};
+    for (final path in allWatchPaths) {
+      final extension = path.split('.').last.toLowerCase();
+      extensionCounts[extension] = (extensionCounts[extension] ?? 0) + 1;
+    }
+    result['summary'] = extensionCounts;
+
+    return result;
+  }
 }
 
 /// Represents a running service instance.

@@ -631,6 +631,36 @@ class DashboardService {
                 </div>
             </div>
             
+            <!-- Watched Files -->
+            <div class="card">
+                <div class="card-header">
+                    <span class="emoji">👁️</span>
+                    Watched Files
+                </div>
+                <div id="watchedFilesMetrics">
+                    <div class="metric">
+                        <span>Total Watchers</span>
+                        <span class="metric-value" id="totalWatchers">--</span>
+                    </div>
+                    <div class="metric">
+                        <span>Watch Paths</span>
+                        <span class="metric-value" id="totalWatchPaths">--</span>
+                    </div>
+                    <div class="metric">
+                        <span>Filter Patterns</span>
+                        <span class="metric-value" id="totalPatterns">--</span>
+                    </div>
+                    <div style="margin-top: 10px;">
+                        <button onclick="dashboard.toggleWatchedFilesDetails()" id="watchDetailsToggle">
+                            Show Details
+                        </button>
+                    </div>
+                    <div id="watchedFilesDetails" style="display: none; margin-top: 10px; font-size: 12px;">
+                        <!-- Detailed watched files info will be populated by JavaScript -->
+                    </div>
+                </div>
+            </div>
+            
             <!-- Recent Reload Activity -->
             <div class="card">
                 <div class="card-header">
@@ -730,6 +760,7 @@ class DashboardService {
                 this.updateSystemOverview(data);
                 this.updateServices(data.services || []);
                 this.updatePerformanceMetrics(data.metrics || {});
+                this.updateWatchedFiles(data.metrics?.serviceMetrics?.watchedFiles || {});
                 this.updateReloadHistory(data.reloadHistory || []);
             }
             
@@ -780,6 +811,69 @@ class DashboardService {
                     metrics.memoryUsage ? this.formatBytes(metrics.memoryUsage) : '--';
                 document.getElementById('fileWatches').textContent = 
                     metrics.fileWatches || '--';
+            }
+            
+            updateWatchedFiles(watchedFiles) {
+                document.getElementById('totalWatchers').textContent = 
+                    watchedFiles.totalWatchers || 0;
+                document.getElementById('totalWatchPaths').textContent = 
+                    watchedFiles.totalWatchPaths || 0;
+                document.getElementById('totalPatterns').textContent = 
+                    watchedFiles.totalPatterns || 0;
+                
+                // Store watched files data for details view
+                this.watchedFilesData = watchedFiles;
+                
+                // Update details if currently shown
+                if (document.getElementById('watchedFilesDetails').style.display !== 'none') {
+                    this.showWatchedFilesDetails();
+                }
+            }
+            
+            toggleWatchedFilesDetails() {
+                const details = document.getElementById('watchedFilesDetails');
+                const toggle = document.getElementById('watchDetailsToggle');
+                
+                if (details.style.display === 'none') {
+                    this.showWatchedFilesDetails();
+                    details.style.display = 'block';
+                    toggle.textContent = 'Hide Details';
+                } else {
+                    details.style.display = 'none';
+                    toggle.textContent = 'Show Details';
+                }
+            }
+            
+            showWatchedFilesDetails() {
+                const container = document.getElementById('watchedFilesDetails');
+                const data = this.watchedFilesData || {};
+                
+                let html = '<div style="margin-bottom: 10px;"><strong>Services:</strong></div>';
+                
+                (data.services || []).forEach(service => {
+                    const activeStatus = service.isActive ? '🟢' : '🔴';
+                    html += `
+                        <div style="margin-bottom: 8px; padding: 5px; background: rgba(255,255,255,0.05); border-radius: 3px;">
+                            <div><strong>\${activeStatus} \${service.serviceName}</strong></div>
+                            <div style="margin-left: 15px; color: #888;">
+                                Watch Paths: \${service.watchPaths.length}<br>
+                                Patterns: \${service.matcher.patternCount}<br>
+                                Include: \${service.matcher.includePatterns}, Exclude: \${service.matcher.excludePatterns}
+                            </div>
+                        </div>
+                    `;
+                });
+                
+                if (data.summary && Object.keys(data.summary).length > 0) {
+                    html += '<div style="margin-top: 10px;"><strong>File Types:</strong></div>';
+                    html += '<div style="margin-left: 15px; color: #888;">';
+                    for (const [ext, count] of Object.entries(data.summary)) {
+                        html += `.\${ext}: \${count} files<br>`;
+                    }
+                    html += '</div>';
+                }
+                
+                container.innerHTML = html;
             }
             
             updateReloadHistory(events) {

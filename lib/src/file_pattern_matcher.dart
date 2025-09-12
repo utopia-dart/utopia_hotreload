@@ -358,6 +358,25 @@ class FilePatternMatcher {
   /// Returns the number of patterns.
   int get patternCount => _patterns.length;
 
+  /// Returns detailed information about the matcher configuration.
+  Map<String, dynamic> getMatcherInfo() {
+    return {
+      'patternCount': _patterns.length,
+      'patterns': _patterns
+          .map((pattern) => {
+                'pattern': pattern.pattern,
+                'type': pattern.type.name,
+                'include': pattern.include,
+                'priority': pattern.priority,
+                'description': pattern.description,
+              })
+          .toList(),
+      'includePatterns': _patterns.where((p) => p.include).length,
+      'excludePatterns': _patterns.where((p) => !p.include).length,
+      'cachedRegexCount': _regexCache.length,
+    };
+  }
+
   /// Debug method to see the generated regex for a glob pattern.
   String debugGlobRegex(String globPattern) {
     return _globToRegex(globPattern).pattern;

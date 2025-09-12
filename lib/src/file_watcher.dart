@@ -120,6 +120,19 @@ class HotReloadFileWatcher {
     }
   }
 
+  /// Gets information about what files and patterns are being watched.
+  Map<String, dynamic> getWatchInfo() {
+    return {
+      'watchPaths': config.watchPaths,
+      'watchExtensions': config.watchExtensions,
+      'ignorePatterns': config.ignorePatterns,
+      'isActive': _watchers.isNotEmpty,
+      'matcherInfo': _patternMatcher.getMatcherInfo(),
+      'debounceMs': config.debounceDelay.inMilliseconds,
+      'verbose': config.verbose,
+    };
+  }
+
   /// Returns a relative path from the current directory for display purposes.
   String _getRelativePath(String filePath) {
     try {

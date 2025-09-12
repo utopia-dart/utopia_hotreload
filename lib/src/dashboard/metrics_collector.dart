@@ -150,11 +150,20 @@ class MetricsCollector {
         'runningServices': 0,
         'stoppedServices': 0,
         'services': <Map<String, dynamic>>[],
+        'watchedFiles': {
+          'totalWatchers': 0,
+          'totalWatchPaths': 0,
+          'totalPatterns': 0,
+          'services': <Map<String, dynamic>>[],
+          'uniqueWatchPaths': <String>[],
+          'summary': <String, int>{},
+        },
       };
     }
 
     final services = _serviceManager!.getServices();
     final runningServices = _serviceManager!.getRunningServices();
+    final watchedFilesInfo = _serviceManager!.getAllWatchedFiles();
 
     final serviceList = services.map((service) {
       final isRunning = runningServices.containsKey(service.name);
@@ -173,6 +182,7 @@ class MetricsCollector {
       'runningServices': runningServices.length,
       'stoppedServices': services.length - runningServices.length,
       'services': serviceList,
+      'watchedFiles': watchedFilesInfo,
     };
   }
 
