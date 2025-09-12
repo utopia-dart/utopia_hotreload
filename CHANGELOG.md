@@ -1,3 +1,8 @@
+## [1.0.1]
+
+- Documentation updates
+- Cleanup and remove unused libraries
+
 ## [1.0.0]
 
 ### Added
