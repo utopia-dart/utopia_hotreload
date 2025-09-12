@@ -9,6 +9,7 @@ import 'service_config.dart';
 import 'multi_service_manager.dart';
 import 'keyboard_input_handler.dart';
 import 'file_pattern_matcher.dart';
+import 'dashboard/dashboard_service.dart';
 import 'package:vm_service/vm_service.dart';
 import 'package:vm_service/vm_service_io.dart';
 
@@ -291,6 +292,9 @@ class DeveloperTools {
     Duration debounceDelay = const Duration(milliseconds: 500),
     bool verbose = false,
     bool interactive = true,
+    bool enableDashboard = true,
+    String dashboardHost = 'localhost',
+    int dashboardPort = 9000,
   }) async {
     if (services.isEmpty) {
       throw ArgumentError('At least one service must be provided');
@@ -331,6 +335,28 @@ class DeveloperTools {
     }
 
     final manager = MultiServiceManager(services, globalConfig);
+
+    // Start dashboard service if enabled
+    DashboardService? dashboard;
+    if (enableDashboard) {
+      dashboard = DashboardService(
+        host: dashboardHost,
+        port: dashboardPort,
+        enabled: true,
+      );
+
+      try {
+        await dashboard.start();
+        dashboard.attachServiceManager(manager);
+        manager.attachDashboard(dashboard);
+        print(
+            '📊 Dashboard available at: http://$dashboardHost:$dashboardPort');
+      } catch (e) {
+        print('⚠️  Failed to start dashboard: $e');
+        dashboard = null; // Don't use dashboard if it failed to start
+      }
+    }
+
     await manager.startAll(interactive: interactive);
   }
 

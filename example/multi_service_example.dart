@@ -48,6 +48,8 @@ void main() async {
     ],
     globalWatchPaths: ['example'], // Default for all services
     verbose: false, // Global verbose setting
+    enableDashboard: true, // Enable the real-time dashboard
+    dashboardPort: 9000, // Dashboard will be available at http://localhost:9000
   );
 }
 
@@ -206,7 +208,16 @@ Future<void> serveHomePage(HttpResponse response) async {
         <li>Use terminal commands: r (reload), l (list), q (quit)</li>
       </ul>
       
-      <p><a href="/status">📊 Service Status</a> | <a href="/dashboard">📈 Dashboard</a></p>
+      <div style="background: #e3f2fd; padding: 15px; border-radius: 8px; margin: 20px 0;">
+        <h3>🆕 Real-Time Dashboard</h3>
+        <p>View comprehensive development metrics and manage services in real-time:</p>
+        <p><strong><a href="http://localhost:9000" target="_blank">📊 Open Dashboard (Port 9000)</a></strong></p>
+        <p style="font-size: 0.9rem; color: #666;">
+          Features live service monitoring, performance metrics, reload history, and interactive service management.
+        </p>
+      </div>
+      
+      <p><a href="/status">📊 Service Status</a> | <a href="/dashboard">📈 Static Dashboard</a></p>
       
       <script>
         async function testApi() {

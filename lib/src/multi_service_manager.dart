@@ -6,6 +6,7 @@ import 'service_config.dart';
 import 'reload_config.dart';
 import 'file_watcher.dart';
 import 'keyboard_input_handler.dart';
+import 'dashboard/dashboard_service.dart';
 
 /// Manages multiple services in a development environment with coordinated hot reload.
 ///
@@ -20,6 +21,9 @@ class MultiServiceManager {
 
   KeyboardInputHandler? _keyboardHandler;
   bool _isShuttingDown = false;
+
+  // Optional dashboard for recording reload events
+  DashboardService? _dashboardService;
 
   /// Creates a new multi-service manager.
   MultiServiceManager(this._services, this._globalConfig);
@@ -152,6 +156,28 @@ class MultiServiceManager {
     print('');
   }
 
+  /// Attaches a dashboard service for recording reload events and metrics.
+  void attachDashboard(DashboardService dashboard) {
+    _dashboardService = dashboard;
+  }
+
+  /// Records a reload event to the dashboard if available.
+  void _recordReloadEvent({
+    required String serviceName,
+    required String type,
+    required Duration duration,
+    String? error,
+    List<String>? changedFiles,
+  }) {
+    _dashboardService?.recordReloadEvent(
+      serviceName: serviceName,
+      type: type,
+      duration: duration,
+      error: error,
+      changedFiles: changedFiles,
+    );
+  }
+
   Future<void> _startService(ServiceConfig service) async {
     if (_runningServices.containsKey(service.name)) {
       print('⚠️  Service already running: ${service.effectiveDisplayName}');
@@ -272,19 +298,46 @@ Future<void> runServiceScript() async {
   Future<void> _restartService(ServiceInstance instance) async {
     print('🔄 Restarting service: ${instance.config.effectiveDisplayName}');
 
-    // Stop the current process
-    instance.process.kill();
+    final stopwatch = Stopwatch()..start();
+
     try {
-      await instance.process.exitCode.timeout(Duration(seconds: 2));
+      // Stop the current process
+      instance.process.kill();
+      try {
+        await instance.process.exitCode.timeout(Duration(seconds: 2));
+      } catch (e) {
+        instance.process.kill(ProcessSignal.sigkill);
+      }
+
+      // Start a new process
+      final newProcess = await _startServiceProcess(instance.config);
+      instance.process = newProcess;
+
+      stopwatch.stop();
+
+      // Record successful restart
+      _recordReloadEvent(
+        serviceName: instance.config.name,
+        type: 'hot_restart',
+        duration: stopwatch.elapsed,
+      );
+
+      print('✅ Service restarted: ${instance.config.effectiveDisplayName}');
     } catch (e) {
-      instance.process.kill(ProcessSignal.sigkill);
+      stopwatch.stop();
+
+      // Record failed restart
+      _recordReloadEvent(
+        serviceName: instance.config.name,
+        type: 'failed',
+        duration: stopwatch.elapsed,
+        error: e.toString(),
+      );
+
+      print(
+          '❌ Failed to restart service ${instance.config.effectiveDisplayName}: $e');
+      rethrow;
     }
-
-    // Start a new process
-    final newProcess = await _startServiceProcess(instance.config);
-    instance.process = newProcess;
-
-    print('✅ Service restarted: ${instance.config.effectiveDisplayName}');
   }
 
   void _triggerServiceRestart(String serviceName) {
@@ -405,6 +458,32 @@ Future<void> runServiceScript() async {
     for (final service in stoppedServices) {
       startService(service.name);
     }
+  }
+
+  /// Gets all configured services.
+  List<ServiceConfig> getServices() {
+    return List.unmodifiable(_services);
+  }
+
+  /// Gets all currently running service instances.
+  Map<String, ServiceInstance> getRunningServices() {
+    return Map.unmodifiable(_runningServices);
+  }
+
+  /// Gets the status of all services for dashboard display.
+  List<Map<String, dynamic>> getServiceStatuses() {
+    return _services.map((service) {
+      final isRunning = _runningServices.containsKey(service.name);
+      return {
+        'name': service.name,
+        'displayName': service.effectiveDisplayName,
+        'status': isRunning ? 'running' : 'stopped',
+        'priority': service.priority,
+        'autoStart': service.autoStart,
+        'watchPaths': service.watchPaths,
+        'environment': service.environment,
+      };
+    }).toList();
   }
 }
 

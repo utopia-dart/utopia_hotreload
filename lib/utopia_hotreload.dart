@@ -69,3 +69,6 @@ export 'src/file_pattern_matcher.dart'
 
 // Input handling utilities
 export 'src/keyboard_input_handler.dart' show KeyboardInputHandler;
+
+// Dashboard service for real-time monitoring
+export 'src/dashboard/dashboard_service.dart' show DashboardService;
