@@ -3,7 +3,7 @@ import 'dart:async';
 import 'package:test/test.dart';
 import 'package:path/path.dart' as path;
 import 'package:utopia_hotreload/src/file_watcher.dart';
-import 'package:utopia_hotreload/src/reload_mode.dart';
+import 'package:utopia_hotreload/src/reload_config.dart';
 
 void main() {
   group('E2E File Watcher Tests', () {

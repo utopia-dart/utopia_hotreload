@@ -1,6 +1,6 @@
 import 'package:test/test.dart';
 import 'package:utopia_hotreload/utopia_hotreload.dart';
-import 'package:utopia_hotreload/src/reload_mode.dart';
+import 'package:utopia_hotreload/src/reload_config.dart';
 import 'package:utopia_hotreload/src/multi_service_manager.dart';
 
 void main() {

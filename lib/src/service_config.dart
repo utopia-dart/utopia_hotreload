@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'file_pattern_matcher.dart';
 
 /// Configuration for a single service in a multi-service development environment.
 ///
@@ -44,6 +45,21 @@ class ServiceConfig {
   /// Whether to enable verbose logging for this specific service.
   final bool? verbose;
 
+  /// Advanced file pattern matcher for sophisticated filtering.
+  ///
+  /// When provided, this takes precedence over [watchExtensions] and [ignorePatterns].
+  /// Supports glob patterns, regex, and predefined presets.
+  final FilePatternMatcher? patternMatcher;
+
+  /// Preset patterns to use for file matching.
+  ///
+  /// Common values: 'dart-project', 'web-project', 'flutter-project', 'test-only', 'config-only'.
+  /// When provided, a [FilePatternMatcher] is automatically created from the preset.
+  final List<String> patternPresets;
+
+  /// Custom file patterns to use in addition to presets.
+  final List<FilePattern> customPatterns;
+
   /// Creates a new service configuration.
   ///
   /// ## Example
@@ -63,6 +79,9 @@ class ServiceConfig {
     this.watchPaths,
     this.watchExtensions,
     this.ignorePatterns,
+    this.patternMatcher,
+    this.patternPresets = const [],
+    this.customPatterns = const [],
     this.autoStart = true,
     this.priority = 0,
     this.vmServicePort,
@@ -71,8 +90,70 @@ class ServiceConfig {
     this.verbose,
   });
 
+  /// Creates a service configuration with advanced pattern matching using presets.
+  ServiceConfig.withPatterns({
+    required this.name,
+    required this.script,
+    this.displayName,
+    this.watchPaths,
+    List<String> presets = const ['dart-project'],
+    List<FilePattern> patterns = const [],
+    this.autoStart = true,
+    this.priority = 0,
+    this.vmServicePort,
+    this.environment = const {},
+    this.workingDirectory,
+    this.verbose,
+  })  : watchExtensions = null,
+        ignorePatterns = null,
+        patternPresets = presets,
+        customPatterns = patterns,
+        patternMatcher = FilePatternMatcher.custom(
+          patterns: patterns,
+          presets: presets,
+        );
+
+  /// Creates a service configuration using a custom pattern matcher.
+  const ServiceConfig.withMatcher({
+    required this.name,
+    required this.script,
+    this.displayName,
+    this.watchPaths,
+    required this.patternMatcher,
+    this.autoStart = true,
+    this.priority = 0,
+    this.vmServicePort,
+    this.environment = const {},
+    this.workingDirectory,
+    this.verbose,
+  })  : watchExtensions = null,
+        ignorePatterns = null,
+        patternPresets = const [],
+        customPatterns = const [];
+
   /// The effective display name for this service.
   String get effectiveDisplayName => displayName ?? name;
+
+  /// Gets the effective pattern matcher for this service.
+  ///
+  /// Returns the configured [patternMatcher] if available, otherwise creates
+  /// one from [patternPresets] and [customPatterns], or returns null to use
+  /// legacy extension-based filtering.
+  FilePatternMatcher? get effectivePatternMatcher {
+    if (patternMatcher != null) {
+      return patternMatcher!;
+    }
+
+    if (patternPresets.isNotEmpty || customPatterns.isNotEmpty) {
+      return FilePatternMatcher.custom(
+        patterns: customPatterns,
+        presets: patternPresets,
+      );
+    }
+
+    // Return null to use legacy extension-based filtering
+    return null;
+  }
 
   /// Creates a copy of this service config with updated values.
   ServiceConfig copyWith({
@@ -82,6 +163,9 @@ class ServiceConfig {
     List<String>? watchPaths,
     List<String>? watchExtensions,
     List<String>? ignorePatterns,
+    FilePatternMatcher? patternMatcher,
+    List<String>? patternPresets,
+    List<FilePattern>? customPatterns,
     bool? autoStart,
     int? priority,
     int? vmServicePort,
@@ -96,6 +180,9 @@ class ServiceConfig {
       watchPaths: watchPaths ?? this.watchPaths,
       watchExtensions: watchExtensions ?? this.watchExtensions,
       ignorePatterns: ignorePatterns ?? this.ignorePatterns,
+      patternMatcher: patternMatcher ?? this.patternMatcher,
+      patternPresets: patternPresets ?? this.patternPresets,
+      customPatterns: customPatterns ?? this.customPatterns,
       autoStart: autoStart ?? this.autoStart,
       priority: priority ?? this.priority,
       vmServicePort: vmServicePort ?? this.vmServicePort,

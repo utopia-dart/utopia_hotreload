@@ -2,24 +2,28 @@ import 'dart:async';
 import 'dart:io';
 import 'package:path/path.dart' as path;
 
-import 'reload_mode.dart';
+import 'reload_config.dart';
+import 'file_pattern_matcher.dart';
 
 /// Monitors file system changes and triggers reload callbacks.
 ///
 /// Provides intelligent filtering based on file extensions, ignore patterns,
-/// and debouncing to prevent excessive reload triggers during rapid file saves.
+/// advanced pattern matching, and debouncing to prevent excessive reload triggers.
 class HotReloadFileWatcher {
   final ReloadConfig config;
   final List<StreamSubscription> _watchers = [];
   Timer? _debounceTimer;
+  late final FilePatternMatcher _patternMatcher;
 
   /// Creates a new file watcher with the given [config].
-  HotReloadFileWatcher(this.config);
+  HotReloadFileWatcher(this.config) {
+    _patternMatcher = config.effectivePatternMatcher;
+  }
 
   /// Starts watching for file changes and calls [onFileChanged] when relevant files are modified.
   ///
-  /// Only files matching [config.watchExtensions] and not matching [config.ignorePatterns]
-  /// will trigger the callback. Changes are debounced using [config.debounceDelay].
+  /// Uses advanced pattern matching if configured, otherwise falls back to
+  /// extension-based filtering and ignore patterns. Changes are debounced using [config.debounceDelay].
   Future<void> start(Function(String filePath) onFileChanged) async {
     print('👁️  Setting up file watchers...');
 
@@ -36,21 +40,16 @@ class HotReloadFileWatcher {
                 '📁 File event: ${event.type} - ${_getRelativePath(filePath)}');
           }
 
-          if (!_shouldWatchFile(filePath)) {
+          // Use advanced pattern matching if available, otherwise use legacy filtering
+          final shouldWatch = _shouldWatchFileAdvanced(filePath);
+
+          if (!shouldWatch) {
             if (config.verbose) {
-              print(
-                  '⏭️  Skipping file (extension): ${_getRelativePath(filePath)}');
+              print('⏭️  Skipping file: ${_getRelativePath(filePath)}');
             }
             return;
           }
 
-          if (_shouldIgnoreFile(filePath)) {
-            if (config.verbose) {
-              print(
-                  '⏭️  Skipping file (ignored): ${_getRelativePath(filePath)}');
-            }
-            return;
-          }
           if (config.verbose) {
             print('✅ File passed filters: ${_getRelativePath(filePath)}');
           }
@@ -87,49 +86,16 @@ class HotReloadFileWatcher {
     _watchers.clear();
   }
 
-  /// Returns `true` if the file should be watched based on its extension.
-  bool _shouldWatchFile(String filePath) {
-    for (final ext in config.watchExtensions) {
-      if (filePath.endsWith(ext)) {
-        return true;
-      }
-    }
-    return false;
+  /// Determines if a file should be watched using advanced pattern matching or legacy filtering.
+  bool _shouldWatchFileAdvanced(String filePath) {
+    // Get relative path for pattern matching
+    final relativePath = _getRelativePathFromWatchPaths(filePath);
+
+    // Use the pattern matcher which combines both include and exclude rules
+    return _patternMatcher.matches(relativePath);
   }
 
-  /// Returns `true` if the file should be ignored based on ignore patterns.
-  bool _shouldIgnoreFile(String filePath) {
-    final relativePath =
-        path.normalize(_getRelativePathFromWatchPaths(filePath));
-
-    for (final pattern in config.ignorePatterns) {
-      final normalizedPattern = path.normalize(pattern);
-
-      if (normalizedPattern.startsWith('**') &&
-          normalizedPattern.endsWith('**')) {
-        final innerPattern =
-            normalizedPattern.substring(2, normalizedPattern.length - 2);
-        if (relativePath.contains(innerPattern)) {
-          return true;
-        }
-      } else if (normalizedPattern.contains('*')) {
-        final regexPattern =
-            normalizedPattern.replaceAll('.', r'\.').replaceAll('*', '.*');
-        if (RegExp(regexPattern).hasMatch(relativePath)) {
-          return true;
-        }
-      } else {
-        if (path
-            .normalize(relativePath)
-            .contains(path.normalize(normalizedPattern))) {
-          return true;
-        }
-      }
-    }
-    return false;
-  }
-
-  /// Returns the relative path from the watch paths for ignore pattern matching.
+  /// Returns a relative path from the watch paths for pattern matching.
   String _getRelativePathFromWatchPaths(String filePath) {
     final normalizedFilePath = path.normalize(path.absolute(filePath));
 

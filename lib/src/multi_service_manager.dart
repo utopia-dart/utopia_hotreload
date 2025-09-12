@@ -3,7 +3,7 @@ import 'dart:io';
 import 'dart:convert';
 
 import 'service_config.dart';
-import 'reload_mode.dart';
+import 'reload_config.dart';
 import 'file_watcher.dart';
 import 'keyboard_input_handler.dart';
 
@@ -72,7 +72,7 @@ class MultiServiceManager {
       return;
     }
 
-    print('🛑 Stopping service: ${instance.config.effectiveDisplayName}');
+    print('[STOP] Stopping service: ${instance.config.effectiveDisplayName}');
     await _stopService(serviceName);
   }
 
@@ -112,6 +112,9 @@ class MultiServiceManager {
 
     print('');
     print('👋 Shutting down multi-service environment...');
+
+    // Mark keyboard handler as shutting down to prevent Windows VM crashes
+    KeyboardInputHandler.markShuttingDown();
 
     // Stop keyboard input handler
     await _keyboardHandler?.stop();
@@ -330,7 +333,7 @@ Future<void> runServiceScript() async {
     });
 
     _keyboardHandler!.registerCommand('s', () {
-      print('🛑 Stopping services...');
+      print('[STOP] Stopping services...');
       _listAndStopServices();
     });
 
@@ -347,11 +350,11 @@ Future<void> runServiceScript() async {
     // Start listening with help text
     final helpText = '''
 💡 Multi-service commands available:
-  r + Enter: Hot restart all services
-  l + Enter: List service status
-  s + Enter: Stop all running services
-  t + Enter: Start all stopped services
-  q + Enter: Quit all services
+  r: Hot restart all services
+  l: List service status
+  s: Stop all running services
+  t: Start all stopped services
+  q: Quit all services
   Ctrl+C: Force quit
 
 🎮 Background keyboard input enabled...
@@ -372,7 +375,7 @@ Future<void> runServiceScript() async {
       return;
     }
 
-    print('🛑 Running services (will stop all):');
+    print('[STOP] Running services (will stop all):');
     for (final serviceName in runningServices) {
       print('  • $serviceName');
     }
