@@ -12,6 +12,8 @@ void main() async {
     watchExtensions: ['.dart'],
     debounceDelay: Duration(milliseconds: 300),
     verbose: false, // Set to true for detailed logging
+    enableDashboard: true,
+    dashboardPort: 9000,
   );
 }
 

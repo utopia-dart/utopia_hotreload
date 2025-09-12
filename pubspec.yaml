@@ -1,6 +1,6 @@
 name: utopia_hotreload
 description: Advanced hot reload and hot restart functionality for Dart applications with true VM-based hot reload capabilities, similar to Flutter's development experience.
-version: 1.0.1
+version: 2.0.0
 
 homepage: https://github.com/utopia-dart/utopia_hotreload
 repository: https://github.com/utopia-dart/utopia_hotreload

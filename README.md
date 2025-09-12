@@ -17,6 +17,9 @@ Advanced hot reload and hot restart functionality for Dart applications with tru
 - **⌨️ Flutter-like Commands**: 'r' for hot reload, 'R' for hot restart, 'q' to quit
 - **📁 File Watching**: Configurable paths and extensions with debouncing
 - **🎯 Smart Fallback**: Graceful error handling with automatic mode switching
+- **🌐 Multi-Service Support**: Run multiple services simultaneously with coordinated reload
+- **📊 Real-Time Web Dashboard**: Live monitoring, metrics, file watching, and reload history
+- **⚡ Advanced Pattern Matching**: Glob patterns, regex, and predefined presets for sophisticated file filtering
 
 ## Installation
 
@@ -107,6 +110,56 @@ await DeveloperTools.start(
   verbose: true,
 );
 ```
+
+### 📊 Web Dashboard
+
+Enable the built-in web dashboard for real-time monitoring of your development session:
+
+```dart
+await DeveloperTools.start(
+  script: () async {
+    // Your application code
+  },
+  enableDashboard: true,        // Enable the web dashboard
+  dashboardPort: 9000,          // Dashboard port (defaults to 9000)
+  watchPaths: ['lib', 'bin'],
+);
+```
+
+When enabled, the dashboard provides:
+
+- **📈 Real-time Metrics**: Uptime, memory usage, reload statistics
+- **📁 File Monitoring**: Live view of watched files and recent changes
+- **🔄 Reload History**: Timeline of hot reloads and restarts with performance data
+- **⚙️ Service Management**: Start, stop, and restart services from the web interface
+- **📊 Performance Insights**: Success rates, average reload times, and error tracking
+
+Access the dashboard at: `http://localhost:9000` (or your configured port)
+
+![Dashboard Preview](https://via.placeholder.com/800x400/2d3748/ffffff?text=Dashboard+Preview)
+
+#### Dashboard Features
+
+**Live Metrics Panel:**
+- Application uptime
+- Memory usage tracking
+- Reload success/failure rates
+- Average reload times
+
+**File Watching Panel:**
+- Real-time list of watched files
+- Recent file changes with timestamps
+- File pattern matching status
+
+**Reload History:**
+- Complete timeline of reload events
+- Performance metrics for each reload
+- Error details and diagnostics
+
+**Service Management:**
+- View all running services
+- Control individual services
+- Real-time status updates
 
 ## Flutter-like Development Experience
 
@@ -209,7 +262,138 @@ For structural changes that can't be hot reloaded:
 ]
 ```
 
+## 📊 Real-Time Dashboard
+
+The package includes a powerful real-time dashboard for monitoring your development environment when using multi-service mode.
+
+### Features
+
+- **🔴 Live Service Monitoring**: Real-time status of all running services
+- **📈 Performance Metrics**: Memory usage, reload times, and success rates
+- **📋 Reload History**: Detailed timeline of all hot reload and restart events
+- **⚡ Interactive Management**: Start, stop, and restart services from the web interface
+- **📊 Analytics**: Service performance breakdown and trends
+- **🔄 Auto-Updates**: WebSocket-based live updates every 2 seconds
+
+### Usage
+
+The dashboard is automatically enabled for multi-service development:
+
+```dart
+import 'package:utopia_hotreload/utopia_hotreload.dart';
+
+void main() async {
+  await DeveloperTools.startMultiple([
+    ServiceConfig(
+      name: 'api-server',
+      script: runApiServer,
+      displayName: 'API Server',
+    ),
+    ServiceConfig(
+      name: 'web-server', 
+      script: runWebServer,
+      displayName: 'Web Server',
+    ),
+  ], 
+  enableDashboard: true,     // Enable dashboard (default: true)
+  dashboardPort: 9000,       // Dashboard port (default: 9000)
+  dashboardHost: 'localhost', // Dashboard host (default: 'localhost')
+  );
+}
+```
+
+### Accessing the Dashboard
+
+Once your multi-service environment starts, the dashboard will be available at:
+
+```
+📊 Dashboard available at: http://localhost:9000
+```
+
+### Dashboard Features
+
+#### System Overview
+- **Uptime**: Total development session time
+- **Active Services**: Number of currently running services
+- **Total Reloads**: Count of all reload operations performed
+- **Connected Clients**: Number of dashboard connections
+
+#### Service Management
+- **Real-time Status**: See which services are running, stopped, or failed
+- **Interactive Controls**: Start, stop, and restart individual services
+- **Priority Display**: View service startup priority and auto-start settings
+- **Configuration Info**: Watch paths, environment variables, and settings
+
+#### Performance Monitoring
+- **Average Reload Time**: Performance metrics for hot reload operations
+- **Memory Usage**: Current memory consumption of the development process
+- **File Watches**: Number of active file system monitors
+- **Success Rate**: Percentage of successful vs failed reload attempts
+
+#### Activity Timeline
+- **Recent Reload Events**: Live feed of hot reload and restart operations
+- **Error Tracking**: Detailed error messages when reloads fail
+- **Performance Trends**: Visual indicators of reload performance over time
+- **Service-Specific History**: Filter events by individual services
+
+### API Endpoints
+
+The dashboard also provides REST API endpoints for integration:
+
+- `GET /api/status` - Basic dashboard status
+- `GET /api/metrics` - Performance metrics
+- `GET /api/services` - Service list and status
+- `GET /api/reload-history` - Reload event history
+- `POST /api/services/restart` - Restart a service
+- `POST /api/services/stop` - Stop a service  
+- `POST /api/services/start` - Start a service
+
 ## Examples
+
+### Multi-Service Development
+
+```dart
+import 'dart:io';
+import 'package:utopia_hotreload/utopia_hotreload.dart';
+
+void main() async {
+  await DeveloperTools.startMultiple([
+    // API Server
+    ServiceConfig(
+      name: 'api',
+      script: () async {
+        final server = await HttpServer.bind('localhost', 3000);
+        await for (final request in server) {
+          request.response
+            ..headers.contentType = ContentType.json
+            ..write('{"message": "API is running", "time": "${DateTime.now()}"}')
+            ..close();
+        }
+      },
+      displayName: 'API Server',
+      watchPaths: ['lib/api'],
+      priority: 10,
+    ),
+    
+    // Web Server  
+    ServiceConfig(
+      name: 'web',
+      script: () async {
+        final server = await HttpServer.bind('localhost', 8080);
+        await for (final request in server) {
+          request.response
+            ..headers.contentType = ContentType.html
+            ..write('<h1>Web Server</h1><p>Dashboard: <a href="http://localhost:9000">View Dashboard</a></p>')
+            ..close();
+        }
+      },
+      displayName: 'Web Server',
+      watchPaths: ['lib/web'],
+      priority: 5,
+    ),
+  ]);
+}
+```
 
 ### Simple HTTP Server
 

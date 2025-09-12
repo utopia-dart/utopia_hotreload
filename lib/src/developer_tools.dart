@@ -9,6 +9,7 @@ import 'service_config.dart';
 import 'multi_service_manager.dart';
 import 'keyboard_input_handler.dart';
 import 'file_pattern_matcher.dart';
+import 'dashboard/dashboard_service.dart';
 import 'package:vm_service/vm_service.dart';
 import 'package:vm_service/vm_service_io.dart';
 
@@ -150,6 +151,8 @@ class DeveloperTools {
     Duration debounceDelay = const Duration(milliseconds: 500),
     bool verbose = false,
     int? childVmServicePort,
+    bool enableDashboard = false,
+    int dashboardPort = 9000,
   }) async {
     if (Platform.environment['UTOPIA_DEV_MODE'] == 'true') {
       await script();
@@ -169,6 +172,8 @@ class DeveloperTools {
         debounceDelay: debounceDelay,
         verbose: verbose,
         childVmServicePort: childVmServicePort,
+        enableDashboard: enableDashboard,
+        dashboardPort: dashboardPort,
       );
     } else if (patternPresets.isNotEmpty || customPatterns.isNotEmpty) {
       config = ReloadConfig.withPatterns(
@@ -179,6 +184,8 @@ class DeveloperTools {
         debounceDelay: debounceDelay,
         verbose: verbose,
         childVmServicePort: childVmServicePort,
+        enableDashboard: enableDashboard,
+        dashboardPort: dashboardPort,
       );
     } else {
       config = ReloadConfig(
@@ -189,6 +196,8 @@ class DeveloperTools {
         debounceDelay: debounceDelay,
         verbose: verbose,
         childVmServicePort: childVmServicePort,
+        enableDashboard: enableDashboard,
+        dashboardPort: dashboardPort,
       );
     }
 
@@ -291,6 +300,9 @@ class DeveloperTools {
     Duration debounceDelay = const Duration(milliseconds: 500),
     bool verbose = false,
     bool interactive = true,
+    bool enableDashboard = true,
+    String dashboardHost = 'localhost',
+    int dashboardPort = 9000,
   }) async {
     if (services.isEmpty) {
       throw ArgumentError('At least one service must be provided');
@@ -331,6 +343,28 @@ class DeveloperTools {
     }
 
     final manager = MultiServiceManager(services, globalConfig);
+
+    // Start dashboard service if enabled
+    DashboardService? dashboard;
+    if (enableDashboard) {
+      dashboard = DashboardService(
+        host: dashboardHost,
+        port: dashboardPort,
+        enabled: true,
+      );
+
+      try {
+        await dashboard.start();
+        dashboard.attachServiceManager(manager);
+        manager.attachDashboard(dashboard);
+        print(
+            '📊 Dashboard available at: http://$dashboardHost:$dashboardPort');
+      } catch (e) {
+        print('⚠️  Failed to start dashboard: $e');
+        dashboard = null; // Don't use dashboard if it failed to start
+      }
+    }
+
     await manager.startAll(interactive: interactive);
   }
 
@@ -397,6 +431,9 @@ class _DevelopmentServer {
   bool _vmConnected = false;
   int? _childVmPort;
 
+  // Dashboard support
+  DashboardService? _dashboard;
+
   _DevelopmentServer({required this.config});
 
   Future<void> start() async {
@@ -404,13 +441,23 @@ class _DevelopmentServer {
     print('📁 Watching paths: ${config.watchPaths}');
     print('📄 Watching extensions: ${config.watchExtensions}');
     print('');
+
+    await _setupFileWatcher();
+
+    // Setup dashboard if enabled (after file watcher is ready)
+    if (config.enableDashboard) {
+      await _setupDashboard();
+    }
+
     print('💡 Commands available:');
     print('  r: Hot reload (preserves state)');
     print('  R: Hot restart (full restart)');
     print('  q: Quit');
+    if (config.enableDashboard) {
+      print('  📊 Dashboard: http://localhost:${config.dashboardPort}');
+    }
     print('');
 
-    await _setupFileWatcher();
     await _setupStdinListener();
     await _startUserScript();
 
@@ -435,6 +482,25 @@ class _DevelopmentServer {
     });
 
     print('✅ Started ${config.watchPaths.length} file watcher(s)');
+  }
+
+  Future<void> _setupDashboard() async {
+    try {
+      _dashboard = DashboardService(
+        host: 'localhost',
+        port: config.dashboardPort,
+      );
+
+      // Attach the file watcher to the dashboard
+      _dashboard!.attachFileWatcher(_fileWatcher);
+
+      await _dashboard!.start();
+      print(
+          '📊 Dashboard started at: http://localhost:${config.dashboardPort}');
+    } catch (e) {
+      print('⚠️  Failed to start dashboard: $e');
+      _dashboard = null;
+    }
   }
 
   Future<void> _setupStdinListener() async {
@@ -621,22 +687,48 @@ class _DevelopmentServer {
         if (config.verbose) {
           print('ℹ️  Child VM service not connected; cannot hot reload');
         }
+        _dashboard?.recordReloadEvent(
+          serviceName: 'main',
+          type: 'failed',
+          duration: Duration.zero,
+          error: 'VM service not connected',
+        );
         return false;
       }
       print('🔥 Performing hot reload...');
+      final stopwatch = Stopwatch()..start();
       final report = await _childVmService!.reloadSources(_childIsolateId!);
+      stopwatch.stop();
+
       if (report.success == true) {
         print('✅ Hot reload completed');
+        _dashboard?.recordReloadEvent(
+          serviceName: 'main',
+          type: 'hot_reload',
+          duration: Duration(milliseconds: stopwatch.elapsedMilliseconds),
+        );
         return true;
       }
-      if (config.verbose && report.json != null) {
-        print('❌ Hot reload failed: ${report.json}');
-      } else {
-        print('❌ Hot reload failed');
-      }
+
+      final errorMessage = config.verbose && report.json != null
+          ? 'Hot reload failed: ${report.json}'
+          : 'Hot reload failed';
+      print('❌ $errorMessage');
+      _dashboard?.recordReloadEvent(
+        serviceName: 'main',
+        type: 'failed',
+        duration: Duration(milliseconds: stopwatch.elapsedMilliseconds),
+        error: errorMessage,
+      );
       return false;
     } catch (e) {
       print('❌ Hot reload failed: $e');
+      _dashboard?.recordReloadEvent(
+        serviceName: 'main',
+        type: 'failed',
+        duration: Duration.zero,
+        error: 'Hot reload failed: $e',
+      );
       return false;
     }
   }
@@ -645,12 +737,25 @@ class _DevelopmentServer {
     try {
       print('🔄 Performing hot restart...');
       _isRestarting = true;
+      final stopwatch = Stopwatch()..start();
       await _killUserProcess();
       await Future.delayed(Duration(milliseconds: 150));
       await _startUserScript();
+      stopwatch.stop();
       print('✅ Hot restart completed');
+      _dashboard?.recordReloadEvent(
+        serviceName: 'main',
+        type: 'hot_restart',
+        duration: Duration(milliseconds: stopwatch.elapsedMilliseconds),
+      );
     } catch (e) {
       print('❌ Hot restart failed: $e');
+      _dashboard?.recordReloadEvent(
+        serviceName: 'main',
+        type: 'failed',
+        duration: Duration.zero,
+        error: 'Hot restart failed: $e',
+      );
     } finally {
       _isRestarting = false;
     }
@@ -677,6 +782,10 @@ class _DevelopmentServer {
 
     await _stdinSubscription?.cancel();
     await _fileWatcher.stop();
+
+    // Stop dashboard if running
+    await _dashboard?.stop();
+
     await _killUserProcess();
 
     print('Development server stopped');
