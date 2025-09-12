@@ -21,15 +21,16 @@ Future<void> runApplication() async {
   print('🕐 Started at: ${DateTime.now()}');
   print('');
 
-  // Create a simple HTTP server
-  final server = await HttpServer.bind('localhost', 8081);
+  // Create a simple HTTP server on any available port
+  final server = await HttpServer.bind('localhost', 8080);
+  final port = server.port;
 
-  print('🌐 Server running on: http://localhost:8080');
+  print('🌐 Server running on: http://localhost:$port');
   print('');
   print('Try these endpoints:');
-  print('  • http://localhost:8080/ - Home page');
-  print('  • http://localhost:8080/api/time - JSON time endpoint');
-  print('  • http://localhost:8080/api/status - Server status');
+  print('  • http://localhost:$port/ - Home page');
+  print('  • http://localhost:$port/api/time - JSON time endpoint');
+  print('  • http://localhost:$port/api/status - Server status');
   print('');
   print('💡 Edit this file and save to see hot reload in action!');
   print('');
@@ -82,7 +83,7 @@ Future<void> handleHomePage(HttpResponse response) async {
             margin: 0 auto;
             padding: 2rem;
             line-height: 1.6;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(135deg, #667eea 0%, #764bd5 100%);
             color: white;
             min-height: 100vh;
         }

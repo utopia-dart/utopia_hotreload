@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'package:path/path.dart' as path;
 
 import 'reload_mode.dart';
 
@@ -44,6 +45,11 @@ class HotReloadFileWatcher {
                   '⏭️  Skipping file (ignored): ${_getRelativePath(filePath)}');
             }
             return;
+          }
+
+          // Debug: Print what got through the filters
+          if (config.verbose) {
+            print('✅ File passed filters: ${_getRelativePath(filePath)}');
           }
 
           // Debounce file changes
@@ -91,25 +97,32 @@ class HotReloadFileWatcher {
 
   /// Check if a file should be ignored based on patterns
   bool _shouldIgnoreFile(String filePath) {
-    final relativePath = _getRelativePath(filePath);
+    final relativePath =
+        path.normalize(_getRelativePathFromWatchPaths(filePath));
 
     for (final pattern in config.ignorePatterns) {
+      final normalizedPattern = path.normalize(pattern);
+
       // Handle glob-like patterns
-      if (pattern.startsWith('**') && pattern.endsWith('**')) {
-        final innerPattern = pattern.substring(2, pattern.length - 2);
+      if (normalizedPattern.startsWith('**') &&
+          normalizedPattern.endsWith('**')) {
+        final innerPattern =
+            normalizedPattern.substring(2, normalizedPattern.length - 2);
         if (relativePath.contains(innerPattern)) {
           return true;
         }
-      } else if (pattern.contains('*')) {
+      } else if (normalizedPattern.contains('*')) {
         // Simple wildcard matching
         final regexPattern =
-            pattern.replaceAll('.', '\\.').replaceAll('*', '.*');
+            normalizedPattern.replaceAll('.', r'\.').replaceAll('*', '.*');
         if (RegExp(regexPattern).hasMatch(relativePath)) {
           return true;
         }
       } else {
-        // Simple string matching
-        if (relativePath.contains(pattern)) {
+        // Simple string matching - normalize both paths for comparison
+        if (path
+            .normalize(relativePath)
+            .contains(path.normalize(normalizedPattern))) {
           return true;
         }
       }
@@ -117,16 +130,45 @@ class HotReloadFileWatcher {
     return false;
   }
 
+  /// Get relative path from the watch paths (for ignore pattern matching)
+  String _getRelativePathFromWatchPaths(String filePath) {
+    // Normalize the file path
+    final normalizedFilePath = path.normalize(path.absolute(filePath));
+
+    // Try to find the relative path from any of the watch paths
+    for (final watchPath in config.watchPaths) {
+      final normalizedWatchPath = path.normalize(path.absolute(watchPath));
+
+      // Check if the file is within this watch path
+      if (normalizedFilePath.startsWith(normalizedWatchPath + path.separator) ||
+          normalizedFilePath == normalizedWatchPath) {
+        // Calculate relative path
+        final relativePath =
+            normalizedFilePath.substring(normalizedWatchPath.length);
+        // Remove leading separator if present
+        if (relativePath.startsWith(path.separator)) {
+          return relativePath.substring(1);
+        }
+        return relativePath;
+      }
+    }
+
+    // Fallback: try to get relative path from current directory
+    try {
+      return path.relative(normalizedFilePath);
+    } catch (e) {
+      // Last resort: return just the filename
+      return path.basename(filePath);
+    }
+  }
+
   /// Get relative path for display
   String _getRelativePath(String filePath) {
-    final currentDir = Directory.current.path;
-    if (filePath.startsWith(currentDir)) {
-      String relativePath = filePath.substring(currentDir.length);
-      if (relativePath.startsWith(Platform.pathSeparator)) {
-        relativePath = relativePath.substring(1);
-      }
-      return relativePath;
+    try {
+      return path.relative(path.normalize(filePath), from: path.current);
+    } catch (e) {
+      // Fallback to original path if relative calculation fails
+      return filePath;
     }
-    return filePath;
   }
 }
