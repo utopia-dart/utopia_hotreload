@@ -5,6 +5,7 @@ import 'dart:convert';
 import 'service_config.dart';
 import 'reload_mode.dart';
 import 'file_watcher.dart';
+import 'keyboard_input_handler.dart';
 
 /// Manages multiple services in a development environment with coordinated hot reload.
 ///
@@ -17,6 +18,7 @@ class MultiServiceManager {
   final Map<String, HotReloadFileWatcher> _watchers = {};
   final List<StreamSubscription> _subscriptions = [];
 
+  KeyboardInputHandler? _keyboardHandler;
   bool _isShuttingDown = false;
 
   /// Creates a new multi-service manager.
@@ -105,6 +107,9 @@ class MultiServiceManager {
 
     print('');
     print('👋 Shutting down multi-service environment...');
+
+    // Stop keyboard input handler
+    await _keyboardHandler?.stop();
 
     // Stop all file watchers
     for (final watcher in _watchers.values) {
@@ -303,86 +308,95 @@ Future<void> runServiceScript() async {
   }
 
   void _startInteractiveMode() {
-    print('');
-    print('💡 Multi-service commands available:');
-    print('  r + Enter: Hot restart all services');
-    print('  l + Enter: List service status');
-    print('  s + Enter: Stop a service');
-    print('  t + Enter: Start a service');
-    print('  q + Enter: Quit all services');
-    print('  Ctrl+C: Force quit');
-    print('');
+    _keyboardHandler = KeyboardInputHandler(
+      onCtrlC: () => _handleShutdown(),
+      onShutdown: () => _handleShutdown(),
+    );
 
-    // Start listening for keyboard input
-    stdin.lineMode = false;
-    stdin.echoMode = false;
-
-    late StreamSubscription<List<int>> subscription;
-    subscription = stdin.listen((List<int> data) {
-      if (_isShuttingDown) {
-        subscription.cancel();
-        return;
-      }
-
-      final input = String.fromCharCodes(data).trim().toLowerCase();
-      _handleInteractiveCommand(input);
+    // Register command handlers
+    _keyboardHandler!.registerCommand('r', () {
+      print('🔄 Hot restarting all services...');
+      hotRestartAll();
     });
 
-    _subscriptions.add(subscription);
+    _keyboardHandler!.registerCommand('l', () {
+      print('📋 Listing services...');
+      listServices();
+    });
+
+    _keyboardHandler!.registerCommand('s', () {
+      print('🛑 Stopping services...');
+      _listAndStopServices();
+    });
+
+    _keyboardHandler!.registerCommand('t', () {
+      print('🚀 Starting services...');
+      _listAndStartServices();
+    });
+
+    _keyboardHandler!.registerCommand('q', () {
+      print('👋 Shutting down all services...');
+      _handleShutdown();
+    });
+
+    // Start listening with help text
+    final helpText = '''
+💡 Multi-service commands available:
+  r + Enter: Hot restart all services
+  l + Enter: List service status
+  s + Enter: Stop all running services
+  t + Enter: Start all stopped services
+  q + Enter: Quit all services
+  Ctrl+C: Force quit
+
+🎮 Background keyboard input enabled...
+💡 Press: r (restart), l (list), s (stop), t (start), q (quit), or Ctrl+C''';
+
+    _keyboardHandler!.start(helpText: helpText);
   }
 
-  void _handleInteractiveCommand(String input) {
-    switch (input) {
-      case 'r':
-        hotRestartAll();
-        break;
-      case 'l':
-        listServices();
-        break;
-      case 's':
-        _promptStopService();
-        break;
-      case 't':
-        _promptStartService();
-        break;
-      case 'q':
-        shutdown();
-        exit(0);
-      default:
-        if (input.isNotEmpty) {
-          print('Unknown command: $input');
-          print('Use r (restart), l (list), s (stop), t (start), q (quit)');
-        }
-    }
+  void _handleShutdown() {
+    shutdown();
+    exit(0);
   }
 
-  void _promptStopService() {
+  void _listAndStopServices() {
     final runningServices = _runningServices.keys.toList();
     if (runningServices.isEmpty) {
-      print('No services are currently running');
+      print('ℹ️  No services are currently running');
       return;
     }
 
-    print('Running services:');
-    for (int i = 0; i < runningServices.length; i++) {
-      print('  ${i + 1}. ${runningServices[i]}');
+    print('🛑 Running services (will stop all):');
+    for (final serviceName in runningServices) {
+      print('  • $serviceName');
     }
-    print('Enter service number to stop:');
+
+    // Stop all running services for simplicity
+    print('💡 Stopping all running services...');
+    for (final serviceName in runningServices) {
+      _stopService(serviceName);
+    }
   }
 
-  void _promptStartService() {
+  void _listAndStartServices() {
     final stoppedServices =
         _services.where((s) => !_runningServices.containsKey(s.name)).toList();
     if (stoppedServices.isEmpty) {
-      print('All services are already running');
+      print('ℹ️  All services are already running');
       return;
     }
 
-    print('Stopped services:');
-    for (int i = 0; i < stoppedServices.length; i++) {
-      print('  ${i + 1}. ${stoppedServices[i].name}');
+    print('🚀 Stopped services (will start all):');
+    for (final service in stoppedServices) {
+      print('  • ${service.name}');
     }
-    print('Enter service number to start:');
+
+    // Start all stopped services for simplicity
+    print('💡 Starting all stopped services...');
+    for (final service in stoppedServices) {
+      startService(service.name);
+    }
   }
 }
 

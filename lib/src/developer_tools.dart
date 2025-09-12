@@ -7,6 +7,7 @@ import 'reload_mode.dart';
 import 'file_watcher.dart';
 import 'service_config.dart';
 import 'multi_service_manager.dart';
+import 'keyboard_input_handler.dart';
 import 'package:vm_service/vm_service.dart';
 import 'package:vm_service/vm_service_io.dart';
 
@@ -299,6 +300,7 @@ class _DevelopmentServer {
   Process? _userProcess;
   late final HotReloadFileWatcher _fileWatcher;
   StreamSubscription? _stdinSubscription;
+  KeyboardInputHandler? _keyboardHandler;
   bool _isReloading = false;
   bool _isRestarting = false;
   bool _isShuttingDown = false;
@@ -349,101 +351,48 @@ class _DevelopmentServer {
   }
 
   Future<void> _setupStdinListener() async {
-    print('🎮 Background keyboard input enabled...');
-    print('💡 Press: r (reload), R (restart), q (quit), or Ctrl+C');
+    _keyboardHandler = KeyboardInputHandler(
+      onCtrlC: () => _shutdown(),
+      onShutdown: () => _shutdown(),
+    );
 
-    bool rawMode = false;
-
-    if (stdin.hasTerminal) {
-      try {
-        stdin.echoMode = false;
-        stdin.lineMode = false;
-        rawMode = true;
-      } catch (e) {
-        rawMode = false;
-      }
-    }
-
-    if (rawMode) {
-      _stdinSubscription = stdin.listen((data) {
-        for (final byte in data) {
-          final char = String.fromCharCode(byte);
-          if (byte == 3) {
-            print('\n🛑 Ctrl+C detected - shutting down...');
-            _shutdown();
-            return;
-          }
-          switch (char) {
-            case 'r':
-              print('\n🔥 Manual hot reload triggered...');
-              _performHotReload();
-              break;
-            case 'R':
-              print('\n🔄 Manual hot restart triggered...');
-              _performHotRestart();
-              break;
-            case 'q':
-            case 'Q':
-              print('\n👋 Shutting down...');
-              _shutdown();
-              return;
-          }
-        }
-      }, onError: (_) {}, cancelOnError: false);
-    } else {
-      _stdinSubscription = stdin
-          .transform(utf8.decoder)
-          .transform(const LineSplitter())
-          .listen((line) {
-        final command = line.trim();
-        switch (command) {
-          case 'r':
-            print('🔥 Manual hot reload triggered...');
-            _performHotReload();
-            break;
-          case 'R':
-            print('🔄 Manual hot restart triggered...');
-            _performHotRestart();
-            break;
-          case 'q':
-          case 'Q':
-          case 'quit':
-          case 'exit':
-            print('👋 Shutting down...');
-            _shutdown();
-            break;
-          default:
-            switch (command.toLowerCase()) {
-              case 'r':
-                print('🔥 Manual hot reload triggered...');
-                _performHotReload();
-                break;
-              case 'q':
-              case 'quit':
-              case 'exit':
-                print('👋 Shutting down...');
-                _shutdown();
-                break;
-            }
-        }
-      }, onError: (_) {}, cancelOnError: false);
-    }
-
-    ProcessSignal.sigint.watch().listen((_) async {
-      print('\n🛑 Ctrl+C detected - shutting down...');
-      await _shutdown();
+    // Register command handlers
+    _keyboardHandler!.registerCommand('r', () {
+      print('🔥 Manual hot reload triggered...');
+      _performHotReload();
     });
 
-    try {
-      if (!Platform.isWindows) {
-        ProcessSignal.sigterm.watch().listen((_) async {
-          print('\n🛑 SIGTERM received - shutting down...');
-          await _shutdown();
-        });
-      }
-    } catch (_) {
-      // Ignore if the platform doesn't support SIGTERM
-    }
+    _keyboardHandler!.registerCommand('R', () {
+      print('🔄 Manual hot restart triggered...');
+      _performHotRestart();
+    });
+
+    _keyboardHandler!.registerCommand('q', () {
+      print('👋 Shutting down...');
+      _shutdown();
+    });
+
+    _keyboardHandler!.registerCommand('Q', () {
+      print('👋 Shutting down...');
+      _shutdown();
+    });
+
+    // Also register lowercase variants for compatibility
+    _keyboardHandler!.registerCommand('quit', () {
+      print('👋 Shutting down...');
+      _shutdown();
+    });
+
+    _keyboardHandler!.registerCommand('exit', () {
+      print('� Shutting down...');
+      _shutdown();
+    });
+
+    // Start listening with help text
+    const helpText = '''🎮 Background keyboard input enabled...
+💡 Press: r (reload), R (restart), q (quit), or Ctrl+C''';
+
+    await _keyboardHandler!.start(helpText: helpText);
   }
 
   Future<void> _startUserScript() async {
@@ -633,16 +582,8 @@ class _DevelopmentServer {
     _isShuttingDown = true;
     print('🛑 Shutting down development server...');
 
-    if (!Platform.isWindows) {
-      try {
-        if (stdin.hasTerminal) {
-          stdin.echoMode = true;
-          stdin.lineMode = true;
-        }
-      } catch (e) {
-        // Ignore terminal restoration errors
-      }
-    }
+    // Stop keyboard input handler (handles terminal restoration)
+    await _keyboardHandler?.stop();
 
     await _stdinSubscription?.cancel();
     await _fileWatcher.stop();

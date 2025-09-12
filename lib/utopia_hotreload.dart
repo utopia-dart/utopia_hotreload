@@ -37,3 +37,6 @@ export 'src/reload_mode.dart' show ReloadMode;
 
 // Multi-service support
 export 'src/service_config.dart' show ServiceConfig;
+
+// Input handling utilities
+export 'src/keyboard_input_handler.dart' show KeyboardInputHandler;
