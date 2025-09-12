@@ -1,0 +1,20 @@
+# Files to exclude from pub package
+# (in addition to .gitignore)
+
+# Development files
+pubspec.lock
+
+# IDE files
+.vscode/
+.idea/
+
+# Test artifacts
+test/.test_runner.dart
+
+# Coverage files
+coverage/
+
+# Temporary files
+*.tmp
+*.temp
+*.log

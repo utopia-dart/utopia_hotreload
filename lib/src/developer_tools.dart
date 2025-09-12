@@ -8,19 +8,19 @@ import 'file_watcher.dart';
 import 'package:vm_service/vm_service.dart';
 import 'package:vm_service/vm_service_io.dart';
 
-/// 🔥 Main developer tools for hot reload functionality
+/// Developer tools for hot reload functionality.
 ///
-/// This class provides a Flutter-like development experience for any Dart application.
-/// It automatically handles hot reload (preserving state) and hot restart (full restart)
-/// based on what changes are made to your code.
+/// Provides a Flutter-like development experience for any Dart application
+/// with automatic hot reload (preserving state) and hot restart (full restart)
+/// based on code changes.
 ///
 /// ## Features
 ///
-/// - **True Hot Reload**: Uses Dart VM service to reload code while preserving application state
-/// - **Smart Fallback**: Automatically falls back to hot restart when hot reload isn't possible
-/// - **File Watching**: Monitors specified directories for changes with intelligent debouncing
+/// - **Hot Reload**: Uses Dart VM service to reload code while preserving state
+/// - **Smart Fallback**: Automatically falls back to hot restart when reload fails
+/// - **File Watching**: Monitors specified directories with intelligent debouncing
 /// - **Interactive Commands**: Flutter-like keyboard shortcuts (r/R/q)
-/// - **Process Isolation**: Runs your app in a separate process for better stability
+/// - **Process Isolation**: Runs your app in a separate process for stability
 ///
 /// ## Example Usage
 ///
@@ -36,7 +36,6 @@ import 'package:vm_service/vm_service_io.dart';
 /// }
 ///
 /// Future<void> runMyApp() async {
-///   // Your application code here
 ///   print('App is running with hot reload!');
 /// }
 /// ```
@@ -45,13 +44,13 @@ class DeveloperTools {
 
   /// Starts a development server with hot reload capabilities.
   ///
-  /// This method sets up file watching, process management, and interactive commands
-  /// to provide a seamless development experience similar to Flutter.
+  /// Sets up file watching, process management, and interactive commands
+  /// to provide a seamless development experience.
   ///
   /// ## Parameters
   ///
-  /// - **[script]**: The main function of your application. This will be executed
-  ///   in a separate process and can be hot reloaded or restarted.
+  /// - **[script]**: The main function of your application. Executed in a
+  ///   separate process and can be hot reloaded or restarted.
   ///
   /// - **[watchPaths]**: List of directory paths to monitor for changes.
   ///   Defaults to `['lib']`. Use relative paths from your project root.
@@ -63,15 +62,17 @@ class DeveloperTools {
   ///   Useful for excluding build directories, version control, etc.
   ///
   /// - **[debounceDelay]**: Time to wait after a file change before triggering
-  ///   a reload. This prevents excessive reloads during rapid file saves.
-  ///   Defaults to 500ms.
+  ///   a reload. Prevents excessive reloads during rapid saves. Defaults to 500ms.
   ///
   /// - **[verbose]**: Enable detailed logging for debugging. Shows file events,
-  ///   VM service details, and other diagnostic information. Defaults to false.
+  ///   VM service details, and diagnostic information. Defaults to false.
+  ///
+  /// - **[childVmServicePort]**: Specific port for the child VM service.
+  ///   If null, uses an available port automatically.
   ///
   /// ## Interactive Commands
   ///
-  /// While the development server is running, you can use these commands:
+  /// While running, use these commands:
   ///
   /// - **`r`** + Enter: Hot reload (preserves application state)
   /// - **`R`** + Enter: Hot restart (full application restart)
@@ -130,18 +131,15 @@ class DeveloperTools {
     bool verbose = false,
     int? childVmServicePort,
   }) async {
-    // Check if this is already the development server process
     if (Platform.environment['UTOPIA_DEV_MODE'] == 'true') {
-      // This is the dev server process, just run the user script
       await script();
       return;
     }
 
-    // Check if VM service is enabled, if not, restart with VM service
     await _ensureVmServiceEnabled();
 
     final config = ReloadConfig(
-      mode: ReloadMode.auto, // Always auto mode like Flutter
+      mode: ReloadMode.auto,
       watchPaths: watchPaths,
       watchExtensions: watchExtensions,
       ignorePatterns: ignorePatterns,
@@ -156,32 +154,28 @@ class DeveloperTools {
     print('  q + Enter: Quit');
     print('');
 
-    // Start the development server that manages the user script in a separate process
     final devServer = _DevelopmentServer(config: config);
     await devServer.start();
   }
 
-  /// Ensure VM service is enabled for true hot reload
+  /// Ensures VM service is enabled for hot reload functionality.
   static Future<void> _ensureVmServiceEnabled() async {
     try {
-      // Try to get service info
       final serviceInfo = await developer.Service.getInfo();
       if (serviceInfo.serverUri != null) {
-        // VM service is already enabled
         return;
       }
     } catch (e) {
       // Service not available
     }
 
-    // VM service is not enabled, restart with it enabled
     if (!Platform.executableArguments.any((arg) =>
         arg.startsWith('--enable-vm-service') || arg.startsWith('--observe'))) {
       print('🔄 Restarting with VM service enabled for true hot reload...');
 
       final scriptPath = Platform.script.toFilePath();
       final args = [
-        '--enable-vm-service=0', // Use port 0 for automatic port selection
+        '--enable-vm-service=0',
         '--disable-service-auth-codes',
         ...Platform.executableArguments,
         scriptPath,
@@ -190,12 +184,9 @@ class DeveloperTools {
       final process = await Process.start(
         Platform.executable,
         args,
-        mode: ProcessStartMode
-            .inheritStdio, // inherit terminal IO so stdin/sigint work
+        mode: ProcessStartMode.inheritStdio,
       );
 
-      // Forward stdout and stderr
-      // With inheritStdio, output is already connected, but keep listeners for safety
       try {
         process.stdout.listen((data) => stdout.add(data));
         process.stderr.listen((data) => stderr.add(data));
@@ -209,7 +200,7 @@ class DeveloperTools {
   }
 }
 
-/// Separate development server process that manages the user script
+/// Development server that manages the user script in a separate process.
 class _DevelopmentServer {
   final ReloadConfig config;
   Process? _userProcess;
@@ -219,11 +210,10 @@ class _DevelopmentServer {
   bool _isRestarting = false;
   bool _isShuttingDown = false;
 
-  // VM service connection to child process for true hot reload
   VmService? _childVmService;
   String? _childIsolateId;
   bool _vmConnected = false;
-  int? _childVmPort; // Keep child VM service port stable across restarts
+  int? _childVmPort;
 
   _DevelopmentServer({required this.config});
 
@@ -238,16 +228,10 @@ class _DevelopmentServer {
     print('  q + Enter: Quit');
     print('');
 
-    // Set up file watching
     await _setupFileWatcher();
-
-    // Set up background stdin listening (safe in dev server process)
     await _setupStdinListener();
-
-    // Start the user script in a separate process
     await _startUserScript();
 
-    // Keep the dev server alive
     await Completer().future;
   }
 
@@ -277,7 +261,6 @@ class _DevelopmentServer {
 
     bool rawMode = false;
 
-    // Try raw mode for immediate character detection (enable on all platforms; fallback on error)
     if (stdin.hasTerminal) {
       try {
         stdin.echoMode = false;
@@ -288,12 +271,10 @@ class _DevelopmentServer {
       }
     }
 
-    // Background stdin listener
     if (rawMode) {
       _stdinSubscription = stdin.listen((data) {
         for (final byte in data) {
           final char = String.fromCharCode(byte);
-          // Handle Ctrl+C in raw mode (ETX, char code 3)
           if (byte == 3) {
             print('\n🛑 Ctrl+C detected - shutting down...');
             _shutdown();
@@ -317,7 +298,6 @@ class _DevelopmentServer {
         }
       }, onError: (_) {}, cancelOnError: false);
     } else {
-      // Fallback to line-based mode
       _stdinSubscription = stdin
           .transform(utf8.decoder)
           .transform(const LineSplitter())
@@ -340,7 +320,6 @@ class _DevelopmentServer {
             _shutdown();
             break;
           default:
-            // Also accept lowercase after normalization
             switch (command.toLowerCase()) {
               case 'r':
                 print('🔥 Manual hot reload triggered...');
@@ -357,13 +336,11 @@ class _DevelopmentServer {
       }, onError: (_) {}, cancelOnError: false);
     }
 
-    // Handle Ctrl+C
     ProcessSignal.sigint.watch().listen((_) async {
       print('\n🛑 Ctrl+C detected - shutting down...');
       await _shutdown();
     });
 
-    // Also handle SIGTERM where supported (not on Windows)
     try {
       if (!Platform.isWindows) {
         ProcessSignal.sigterm.watch().listen((_) async {
@@ -379,14 +356,12 @@ class _DevelopmentServer {
   Future<void> _startUserScript() async {
     final scriptPath = Platform.script.toFilePath();
 
-    // Filter out VM service flags from parent args to avoid conflicts
     final parentArgs = Platform.executableArguments.where((arg) {
       return !(arg.startsWith('--enable-vm-service') ||
           arg.startsWith('--observe') ||
           arg.startsWith('--disable-service-auth-codes'));
     }).toList();
 
-    // Reuse the same VM service port for child if known; otherwise optional config or random
     final vmPort = _childVmPort ?? config.childVmServicePort ?? 0;
     final args = [
       '--enable-vm-service=$vmPort',
@@ -404,7 +379,6 @@ class _DevelopmentServer {
       environment: environment,
     );
 
-    // Reset child VM connection state for new child
     _vmConnected = false;
     _childIsolateId = null;
     try {
@@ -412,7 +386,6 @@ class _DevelopmentServer {
     } catch (_) {}
     _childVmService = null;
 
-    // Forward output from user process and sniff VM service URI
     _userProcess!.stdout
         .transform(utf8.decoder)
         .transform(const LineSplitter())
@@ -428,11 +401,9 @@ class _DevelopmentServer {
       _maybeCaptureVmServiceUri(line);
     });
 
-    // Wait a bit for the user script to start
     await Future.delayed(Duration(milliseconds: 1000));
     print('✅ User script started');
 
-    // Monitor user process
     _userProcess!.exitCode.then((exitCode) {
       if (!_isReloading && !_isRestarting && !_isShuttingDown) {
         print('❌ User script exited with code $exitCode');
@@ -441,15 +412,12 @@ class _DevelopmentServer {
     });
   }
 
-  // Parse child's VM service URL from its output and connect
   void _maybeCaptureVmServiceUri(String line) {
     final marker = 'The Dart VM service is listening on ';
     final idx = line.indexOf(marker);
     if (idx == -1) return;
     final uriStr = line.substring(idx + marker.length).trim();
-    // Example: http://127.0.0.1:58858/
     _connectToChildVmService(uriStr);
-    // Remember the child's VM service port for reuse on subsequent restarts
     try {
       final uri = Uri.parse(uriStr);
       if (uri.hasPort && uri.port > 0) {
@@ -491,7 +459,6 @@ class _DevelopmentServer {
     _isReloading = true;
 
     try {
-      // Try hot reload first
       final success = await _performHotReload();
       if (!success) {
         print('🔄 Hot reload failed, performing hot restart...');
@@ -532,14 +499,9 @@ class _DevelopmentServer {
     try {
       print('🔄 Performing hot restart...');
       _isRestarting = true;
-      // Kill current user process
       await _killUserProcess();
-      // Small delay to allow OS to release VM service port
       await Future.delayed(Duration(milliseconds: 150));
-
-      // Start new user process
       await _startUserScript();
-
       print('✅ Hot restart completed');
     } catch (e) {
       print('❌ Hot restart failed: $e');
@@ -561,7 +523,6 @@ class _DevelopmentServer {
     _isShuttingDown = true;
     print('🛑 Shutting down development server...');
 
-    // Restore terminal settings safely
     if (!Platform.isWindows) {
       try {
         if (stdin.hasTerminal) {
@@ -575,7 +536,6 @@ class _DevelopmentServer {
 
     await _stdinSubscription?.cancel();
     await _fileWatcher.stop();
-
     await _killUserProcess();
 
     print('✅ Development server stopped');
@@ -586,7 +546,6 @@ class _DevelopmentServer {
     if (_userProcess == null) return;
     print('   Stopping user script...');
     if (Platform.isWindows) {
-      // Windows: generic kill terminates the process
       _userProcess!.kill();
       try {
         await _userProcess!.exitCode.timeout(Duration(seconds: 2));
@@ -594,7 +553,6 @@ class _DevelopmentServer {
         // Already terminated or unreachable
       }
     } else {
-      // POSIX: try graceful then force
       try {
         _userProcess!.kill(ProcessSignal.sigterm);
       } catch (_) {

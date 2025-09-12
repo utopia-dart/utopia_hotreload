@@ -7,6 +7,9 @@ repository: https://github.com/utopia-dart/utopia_hotreload
 issue_tracker: https://github.com/utopia-dart/utopia_hotreload/issues
 documentation: https://github.com/utopia-dart/utopia_hotreload#readme
 
+funding:
+  - https://github.com/sponsors/utopia-dart
+
 environment:
   sdk: '>=2.17.0 <4.0.0'
 
@@ -24,6 +27,6 @@ dev_dependencies:
 topics:
   - hot-reload
   - development
-  - server
   - dart-vm
   - file-watching
+  - developer-tools

@@ -8,8 +8,11 @@ import 'package:vm_service/vm_service_io.dart';
 import 'reload_mode.dart';
 import 'file_watcher.dart';
 
-/// Hot reload manager that uses Dart VM service for true hot reload
-/// This preserves application state similar to Flutter's hot reload
+/// Manages hot reload functionality using Dart VM service for true state preservation.
+///
+/// This implementation provides Flutter-like hot reload capabilities by connecting
+/// to the VM service and using the `reloadSources()` API to update code without
+/// losing application state.
 class HotReloadManager {
   final ReloadConfig config;
   final Future<void> Function() script;
@@ -19,12 +22,13 @@ class HotReloadManager {
   String? _isolateId;
   bool _isReloading = false;
 
+  /// Creates a new hot reload manager with the given [script] and [config].
   HotReloadManager({
     required this.script,
     required this.config,
   });
 
-  /// Start the hot reload development server
+  /// Starts the hot reload development server.
   Future<void> start() async {
     print('🚀 Starting Development Server with True Hot Reload...');
     print('📁 Watching paths: ${config.watchPaths}');
@@ -32,33 +36,26 @@ class HotReloadManager {
     print('🔥 True hot reload enabled - state will be preserved');
     print('');
 
-    // Enable VM service if not already enabled
     await _enableVmService();
-
-    // Connect to VM service
     await _connectToVmService();
 
-    // Handle Ctrl+C gracefully
     ProcessSignal.sigint.watch().listen((signal) async {
       print('\\n🛑 Shutting down development server...');
       await _shutdown();
       exit(0);
     });
 
-    // Set up file watcher
     _fileWatcher = HotReloadFileWatcher(config);
     await _fileWatcher!.start((_) => _performHotReload());
 
     print('');
 
-    // Start the script in the current isolate
     print('🔄 Starting application...');
     await script();
   }
 
-  /// Enable VM service if not already enabled
+  /// Enables VM service if not already enabled by restarting the process.
   Future<void> _enableVmService() async {
-    // Check if VM service is already enabled by trying to get service info
     try {
       final serviceInfo = await developer.Service.getInfo();
       if (serviceInfo.serverUri != null) {
@@ -71,13 +68,12 @@ class HotReloadManager {
       // Service not available, need to restart with VM service
     }
 
-    // VM service is not enabled, we need to restart with --enable-vm-service
     if (!Platform.executableArguments.contains('--enable-vm-service')) {
       print('🔄 Restarting with VM service enabled...');
 
       final scriptPath = Platform.script.toFilePath();
       final args = [
-        '--enable-vm-service=0', // Use port 0 for automatic port selection
+        '--enable-vm-service=0',
         '--disable-service-auth-codes',
         ...Platform.executableArguments,
         scriptPath,
@@ -86,11 +82,9 @@ class HotReloadManager {
       final process = await Process.start(
         Platform.executable,
         args,
-        mode: ProcessStartMode
-            .inheritStdio, // inherit terminal IO for stdin/sigint
+        mode: ProcessStartMode.inheritStdio,
       );
 
-      // With inheritStdio, output is already connected; ignore if streams not accessible
       try {
         process.stdout.listen((data) => stdout.add(data));
         process.stderr.listen((data) => stderr.add(data));
@@ -101,7 +95,7 @@ class HotReloadManager {
     }
   }
 
-  /// Connect to the VM service
+  /// Connects to the VM service for hot reload functionality.
   Future<void> _connectToVmService() async {
     try {
       final serviceInfo = await developer.Service.getInfo();
@@ -116,7 +110,6 @@ class HotReloadManager {
 
       _vmService = await vmServiceConnectUri(wsUri);
 
-      // Get the main isolate
       final vm = await _vmService!.getVM();
       if (vm.isolates?.isNotEmpty == true) {
         _isolateId = vm.isolates!.first.id!;
@@ -131,7 +124,7 @@ class HotReloadManager {
     }
   }
 
-  /// Perform hot reload using VM service
+  /// Performs hot reload using the VM service to preserve application state.
   Future<void> _performHotReload() async {
     if (_isReloading) return;
     if (_vmService == null || _isolateId == null) {
@@ -144,7 +137,6 @@ class HotReloadManager {
     try {
       print('🔥 Performing hot reload...');
 
-      // Reload sources
       final reloadReport = await _vmService!.reloadSources(_isolateId!);
 
       if (reloadReport.success == true) {
@@ -157,17 +149,15 @@ class HotReloadManager {
         if (reloadReport.json != null) {
           print('   Response: ${reloadReport.json}');
         }
-        // Could fall back to hot restart here
       }
     } catch (e) {
       print('❌ Hot reload error: $e');
-      // Could fall back to hot restart here
     } finally {
       _isReloading = false;
     }
   }
 
-  /// Shutdown the manager
+  /// Shuts down the manager and cleans up resources.
   Future<void> _shutdown() async {
     await _fileWatcher?.stop();
     await _vmService?.dispose();

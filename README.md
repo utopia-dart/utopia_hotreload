@@ -5,8 +5,11 @@ Advanced hot reload and hot restart functionality for Dart applications with tru
 [![Pub Version](https://img.shields.io/pub/v/utopia_hotreload)](https://pub.dev/packages/utopia_hotreload)
 [![Dart SDK Version](https://img.shields.io/badge/dart-%3E%3D2.17.0-blue)](https://dart.dev)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![GitHub Actions](https://github.com/utopia-dart/utopia_hotreload/workflows/CI/badge.svg)](https://github.com/utopia-dart/utopia_hotreload/actions)
+[![Pub Points](https://img.shields.io/pub/points/utopia_hotreload)](https://pub.dev/packages/utopia_hotreload/score)
+[![Pub Popularity](https://img.shields.io/pub/popularity/utopia_hotreload)](https://pub.dev/packages/utopia_hotreload)
 
-## Features
+## ✨ Features
 
 - **🔥 True Hot Reload**: Uses Dart VM service to reload code while preserving application state (like Flutter)
 - **🔄 Hot Restart**: Full process restart when hot reload isn't possible
