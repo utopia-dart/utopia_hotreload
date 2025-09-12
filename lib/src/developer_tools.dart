@@ -5,6 +5,9 @@ import 'dart:developer' as developer;
 
 import 'reload_mode.dart';
 import 'file_watcher.dart';
+import 'service_config.dart';
+import 'multi_service_manager.dart';
+import 'keyboard_input_handler.dart';
 import 'package:vm_service/vm_service.dart';
 import 'package:vm_service/vm_service_io.dart';
 
@@ -158,45 +161,137 @@ class DeveloperTools {
     await devServer.start();
   }
 
+  /// Starts multiple services in a coordinated development environment.
+  ///
+  /// Allows running multiple scripts/services simultaneously, each with their own
+  /// configuration and reload behavior, while providing unified control and monitoring.
+  ///
+  /// ## Parameters
+  ///
+  /// - **[services]**: List of service configurations to start. Each service can
+  ///   have its own watch paths, extensions, and script.
+  ///
+  /// - **[globalWatchPaths]**: Default watch paths used by services that don't
+  ///   specify their own. Defaults to `['lib']`.
+  ///
+  /// - **[globalWatchExtensions]**: Default file extensions used by services that
+  ///   don't specify their own. Defaults to `['.dart']`.
+  ///
+  /// - **[globalIgnorePatterns]**: Default ignore patterns used by services that
+  ///   don't specify their own.
+  ///
+  /// - **[debounceDelay]**: Global debounce delay for file changes. Defaults to 500ms.
+  ///
+  /// - **[verbose]**: Enable detailed logging for all services. Defaults to false.
+  ///
+  /// ## Example
+  ///
+  /// ```dart
+  /// await DeveloperTools.startMultiple([
+  ///   ServiceConfig(
+  ///     name: 'api-server',
+  ///     script: runApiServer,
+  ///     watchPaths: ['lib/api', 'lib/shared'],
+  ///     displayName: 'API Server',
+  ///   ),
+  ///   ServiceConfig(
+  ///     name: 'web-server',
+  ///     script: runWebServer,
+  ///     watchPaths: ['web', 'lib/web'],
+  ///     watchExtensions: ['.dart', '.html', '.css'],
+  ///     displayName: 'Web Server',
+  ///   ),
+  /// ]);
+  /// ```
+  ///
+  /// ## Interactive Commands
+  ///
+  /// While running, use these commands:
+  ///
+  /// - **`r`** + Enter: Hot reload all services
+  /// - **`R`** + Enter: Hot restart all services
+  /// - **`l`** + Enter: List service status
+  /// - **`s`** + Enter: Stop a service
+  /// - **`t`** + Enter: Start a service
+  /// - **`q`** + Enter: Quit all services
+  /// - **Ctrl+C**: Force quit all services
+  static Future<void> startMultiple(
+    List<ServiceConfig> services, {
+    List<String> globalWatchPaths = const ['lib'],
+    List<String> globalWatchExtensions = const ['.dart'],
+    List<String> globalIgnorePatterns = const [
+      '.git/',
+      '.dart_tool/',
+      'build/',
+      'pubspec.lock',
+    ],
+    Duration debounceDelay = const Duration(milliseconds: 500),
+    bool verbose = false,
+    bool interactive = true,
+  }) async {
+    if (services.isEmpty) {
+      throw ArgumentError('At least one service must be provided');
+    }
+
+    await _ensureVmServiceEnabled();
+
+    final globalConfig = ReloadConfig(
+      mode: ReloadMode.auto,
+      watchPaths: globalWatchPaths,
+      watchExtensions: globalWatchExtensions,
+      ignorePatterns: globalIgnorePatterns,
+      debounceDelay: debounceDelay,
+      verbose: verbose,
+    );
+
+    final manager = MultiServiceManager(services, globalConfig);
+    await manager.startAll(interactive: interactive);
+  }
+
   /// Ensures VM service is enabled for hot reload functionality.
   static Future<void> _ensureVmServiceEnabled() async {
+    // Check if VM service is already enabled via command line arguments
+    if (Platform.executableArguments.any((arg) =>
+        arg.startsWith('--enable-vm-service') || arg.startsWith('--observe'))) {
+      return;
+    }
+
+    // Try to check if VM service is available
     try {
-      final serviceInfo = await developer.Service.getInfo();
+      final serviceInfo = await developer.Service.getInfo()
+          .timeout(Duration(milliseconds: 500));
       if (serviceInfo.serverUri != null) {
         return;
       }
     } catch (e) {
-      // Service not available
+      // Service not available or timeout - continue with restart
     }
 
-    if (!Platform.executableArguments.any((arg) =>
-        arg.startsWith('--enable-vm-service') || arg.startsWith('--observe'))) {
-      print('🔄 Restarting with VM service enabled for true hot reload...');
+    print('🔄 Restarting with VM service enabled for true hot reload...');
 
-      final scriptPath = Platform.script.toFilePath();
-      final args = [
-        '--enable-vm-service=0',
-        '--disable-service-auth-codes',
-        ...Platform.executableArguments,
-        scriptPath,
-      ];
+    final scriptPath = Platform.script.toFilePath();
+    final args = [
+      '--enable-vm-service=0',
+      '--disable-service-auth-codes',
+      ...Platform.executableArguments,
+      scriptPath,
+    ];
 
-      final process = await Process.start(
-        Platform.executable,
-        args,
-        mode: ProcessStartMode.inheritStdio,
-      );
+    final process = await Process.start(
+      Platform.executable,
+      args,
+      mode: ProcessStartMode.inheritStdio,
+    );
 
-      try {
-        process.stdout.listen((data) => stdout.add(data));
-        process.stderr.listen((data) => stderr.add(data));
-      } catch (_) {
-        // Ignore if streams are not available in inherit mode
-      }
-
-      final exitCode = await process.exitCode;
-      exit(exitCode);
+    try {
+      process.stdout.listen((data) => stdout.add(data));
+      process.stderr.listen((data) => stderr.add(data));
+    } catch (_) {
+      // Ignore if streams are not available in inherit mode
     }
+
+    final exitCode = await process.exitCode;
+    exit(exitCode);
   }
 }
 
@@ -206,6 +301,7 @@ class _DevelopmentServer {
   Process? _userProcess;
   late final HotReloadFileWatcher _fileWatcher;
   StreamSubscription? _stdinSubscription;
+  KeyboardInputHandler? _keyboardHandler;
   bool _isReloading = false;
   bool _isRestarting = false;
   bool _isShuttingDown = false;
@@ -256,101 +352,48 @@ class _DevelopmentServer {
   }
 
   Future<void> _setupStdinListener() async {
-    print('🎮 Background keyboard input enabled...');
-    print('💡 Press: r (reload), R (restart), q (quit), or Ctrl+C');
+    _keyboardHandler = KeyboardInputHandler(
+      onCtrlC: () => _shutdown(),
+      onShutdown: () => _shutdown(),
+    );
 
-    bool rawMode = false;
-
-    if (stdin.hasTerminal) {
-      try {
-        stdin.echoMode = false;
-        stdin.lineMode = false;
-        rawMode = true;
-      } catch (e) {
-        rawMode = false;
-      }
-    }
-
-    if (rawMode) {
-      _stdinSubscription = stdin.listen((data) {
-        for (final byte in data) {
-          final char = String.fromCharCode(byte);
-          if (byte == 3) {
-            print('\n🛑 Ctrl+C detected - shutting down...');
-            _shutdown();
-            return;
-          }
-          switch (char) {
-            case 'r':
-              print('\n🔥 Manual hot reload triggered...');
-              _performHotReload();
-              break;
-            case 'R':
-              print('\n🔄 Manual hot restart triggered...');
-              _performHotRestart();
-              break;
-            case 'q':
-            case 'Q':
-              print('\n👋 Shutting down...');
-              _shutdown();
-              return;
-          }
-        }
-      }, onError: (_) {}, cancelOnError: false);
-    } else {
-      _stdinSubscription = stdin
-          .transform(utf8.decoder)
-          .transform(const LineSplitter())
-          .listen((line) {
-        final command = line.trim();
-        switch (command) {
-          case 'r':
-            print('🔥 Manual hot reload triggered...');
-            _performHotReload();
-            break;
-          case 'R':
-            print('🔄 Manual hot restart triggered...');
-            _performHotRestart();
-            break;
-          case 'q':
-          case 'Q':
-          case 'quit':
-          case 'exit':
-            print('👋 Shutting down...');
-            _shutdown();
-            break;
-          default:
-            switch (command.toLowerCase()) {
-              case 'r':
-                print('🔥 Manual hot reload triggered...');
-                _performHotReload();
-                break;
-              case 'q':
-              case 'quit':
-              case 'exit':
-                print('👋 Shutting down...');
-                _shutdown();
-                break;
-            }
-        }
-      }, onError: (_) {}, cancelOnError: false);
-    }
-
-    ProcessSignal.sigint.watch().listen((_) async {
-      print('\n🛑 Ctrl+C detected - shutting down...');
-      await _shutdown();
+    // Register command handlers
+    _keyboardHandler!.registerCommand('r', () {
+      print('🔥 Manual hot reload triggered...');
+      _performHotReload();
     });
 
-    try {
-      if (!Platform.isWindows) {
-        ProcessSignal.sigterm.watch().listen((_) async {
-          print('\n🛑 SIGTERM received - shutting down...');
-          await _shutdown();
-        });
-      }
-    } catch (_) {
-      // Ignore if the platform doesn't support SIGTERM
-    }
+    _keyboardHandler!.registerCommand('R', () {
+      print('🔄 Manual hot restart triggered...');
+      _performHotRestart();
+    });
+
+    _keyboardHandler!.registerCommand('q', () {
+      print('👋 Shutting down...');
+      _shutdown();
+    });
+
+    _keyboardHandler!.registerCommand('Q', () {
+      print('👋 Shutting down...');
+      _shutdown();
+    });
+
+    // Also register lowercase variants for compatibility
+    _keyboardHandler!.registerCommand('quit', () {
+      print('👋 Shutting down...');
+      _shutdown();
+    });
+
+    _keyboardHandler!.registerCommand('exit', () {
+      print('� Shutting down...');
+      _shutdown();
+    });
+
+    // Start listening with help text
+    const helpText = '''🎮 Background keyboard input enabled...
+💡 Press: r (reload), R (restart), q (quit), or Ctrl+C''';
+
+    await _keyboardHandler!.start(helpText: helpText);
   }
 
   Future<void> _startUserScript() async {
@@ -381,10 +424,20 @@ class _DevelopmentServer {
 
     _vmConnected = false;
     _childIsolateId = null;
-    try {
-      await _childVmService?.dispose();
-    } catch (_) {}
-    _childVmService = null;
+
+    // Safe VM service cleanup to prevent SendPort errors
+    if (_childVmService != null) {
+      try {
+        final service = _childVmService;
+        _childVmService = null;
+        await service?.dispose();
+      } catch (e) {
+        // Ignore cleanup errors that can cause SendPort issues
+        if (config.verbose) {
+          print('⚠️  VM service cleanup warning: $e');
+        }
+      }
+    }
 
     _userProcess!.stdout
         .transform(utf8.decoder)
@@ -445,7 +498,14 @@ class _DevelopmentServer {
         _vmConnected = true;
         print('✅ Connected to child VM service - hot reload enabled');
       } else {
-        await service.dispose();
+        // Safe disposal to prevent SendPort errors
+        try {
+          await service.dispose();
+        } catch (e) {
+          if (config.verbose) {
+            print('⚠️  VM service disposal warning: $e');
+          }
+        }
       }
     } catch (e) {
       if (config.verbose) {
@@ -523,16 +583,8 @@ class _DevelopmentServer {
     _isShuttingDown = true;
     print('🛑 Shutting down development server...');
 
-    if (!Platform.isWindows) {
-      try {
-        if (stdin.hasTerminal) {
-          stdin.echoMode = true;
-          stdin.lineMode = true;
-        }
-      } catch (e) {
-        // Ignore terminal restoration errors
-      }
-    }
+    // Stop keyboard input handler (handles terminal restoration)
+    await _keyboardHandler?.stop();
 
     await _stdinSubscription?.cancel();
     await _fileWatcher.stop();
@@ -545,6 +597,20 @@ class _DevelopmentServer {
   Future<void> _killUserProcess() async {
     if (_userProcess == null) return;
     print('   Stopping user script...');
+
+    // Clean up VM service connection before terminating process
+    if (_childVmService != null) {
+      try {
+        final service = _childVmService;
+        _childVmService = null;
+        _vmConnected = false;
+        _childIsolateId = null;
+        await service?.dispose();
+      } catch (e) {
+        // Ignore VM service cleanup errors during shutdown
+      }
+    }
+
     if (Platform.isWindows) {
       _userProcess!.kill();
       try {
