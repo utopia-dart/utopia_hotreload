@@ -1,3 +1,9 @@
+## [2.0.0]
+- Improved reliability and performance of hot reload and hot restart
+- Enhanced file watching with better ignore pattern support
+- Improved logging and error handling mechanisms
+- Dashboard feature to monitor reload status and logs
+
 ## [1.0.1]
 
 - Documentation updates
