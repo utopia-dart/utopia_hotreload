@@ -31,6 +31,29 @@ void main() {
 
         expect(config.effectiveDisplayName, equals('api-server'));
       });
+
+      test('should create service with default values', () {
+        final config = ServiceConfig(
+          name: 'default-service',
+          script: dummyScript,
+        );
+
+        expect(config.name, equals('default-service'));
+        expect(config.effectiveDisplayName, equals('default-service'));
+        expect(config.watchPaths, isNull); // ServiceConfig inherits from parent
+        expect(config.watchExtensions,
+            isNull); // ServiceConfig inherits from parent
+        expect(config.ignorePatterns,
+            isNull); // ServiceConfig inherits from parent
+        expect(config.priority, equals(0));
+        expect(config.autoStart, isTrue);
+        expect(config.patternPresets, isEmpty);
+        expect(config.customPatterns, isEmpty);
+        expect(config.patternMatcher, isNull);
+        expect(config.environment, isEmpty);
+        expect(config.workingDirectory, isNull);
+        expect(config.verbose, isNull);
+      });
     });
 
     group('pattern-based configuration', () {
@@ -151,6 +174,26 @@ void main() {
 
         expect(copied.patternMatcher, equals(newMatcher));
         expect(copied.name, equals('original'));
+      });
+
+      test('should copy watch configuration', () {
+        final original = ServiceConfig(
+          name: 'original',
+          script: dummyScript,
+          watchPaths: ['lib'],
+          watchExtensions: ['.dart'],
+          ignorePatterns: ['.git/'],
+        );
+
+        final copied = original.copyWith(
+          watchPaths: ['lib', 'bin'],
+          watchExtensions: ['.dart', '.yaml'],
+          ignorePatterns: ['.git/', 'build/'],
+        );
+
+        expect(copied.watchPaths, equals(['lib', 'bin']));
+        expect(copied.watchExtensions, equals(['.dart', '.yaml']));
+        expect(copied.ignorePatterns, equals(['.git/', 'build/']));
       });
     });
 

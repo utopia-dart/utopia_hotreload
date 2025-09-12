@@ -58,7 +58,7 @@ library utopia_hotreload;
 export 'src/developer_tools.dart' show DeveloperTools;
 
 // Configuration classes that users might need
-export 'src/reload_mode.dart' show ReloadMode;
+export 'src/reload_config.dart' show ReloadMode;
 
 // Multi-service support
 export 'src/service_config.dart' show ServiceConfig;

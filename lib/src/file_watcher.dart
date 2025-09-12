@@ -2,7 +2,7 @@ import 'dart:async';
 import 'dart:io';
 import 'package:path/path.dart' as path;
 
-import 'reload_mode.dart';
+import 'reload_config.dart';
 import 'file_pattern_matcher.dart';
 
 /// Monitors file system changes and triggers reload callbacks.

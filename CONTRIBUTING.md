@@ -39,7 +39,7 @@ utopia_hotreload/
 │       ├── file_watcher.dart      # File system monitoring
 │       ├── hot_reload_manager.dart # Hot reload logic
 │       ├── hot_restart_manager.dart # Hot restart logic
-│       └── reload_mode.dart       # Configuration types
+│       └── reload_config.dart       # Configuration types
 ├── example/
 │   └── example.dart               # Usage examples
 ├── test/

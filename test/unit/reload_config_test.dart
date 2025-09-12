@@ -1,8 +1,17 @@
 import 'package:test/test.dart';
-import 'package:utopia_hotreload/src/reload_mode.dart';
+import 'package:utopia_hotreload/src/reload_config.dart';
 import 'package:utopia_hotreload/src/file_pattern_matcher.dart';
 
 void main() {
+  group('ReloadMode', () {
+    test('enum values', () {
+      expect(ReloadMode.values.length, equals(3));
+      expect(ReloadMode.values, contains(ReloadMode.hotReload));
+      expect(ReloadMode.values, contains(ReloadMode.hotRestart));
+      expect(ReloadMode.values, contains(ReloadMode.auto));
+    });
+  });
+
   group('ReloadConfig', () {
     group('basic configuration', () {
       test('should create default config', () {
@@ -11,24 +20,30 @@ void main() {
         expect(config.mode, equals(ReloadMode.auto));
         expect(config.watchPaths, equals(['lib']));
         expect(config.watchExtensions, equals(['.dart']));
+        expect(config.ignorePatterns, contains('.git/'));
         expect(config.debounceDelay, equals(Duration(milliseconds: 500)));
         expect(config.verbose, isFalse);
+        expect(config.childVmServicePort, isNull);
       });
 
       test('should create config with custom values', () {
         const config = ReloadConfig(
-          mode: ReloadMode.hotReload,
+          mode: ReloadMode.hotRestart,
           watchPaths: ['lib', 'bin'],
           watchExtensions: ['.dart', '.yaml'],
-          debounceDelay: Duration(milliseconds: 200),
+          ignorePatterns: ['.git/', 'build/'],
+          debounceDelay: Duration(seconds: 1),
           verbose: true,
+          childVmServicePort: 12345,
         );
 
-        expect(config.mode, equals(ReloadMode.hotReload));
+        expect(config.mode, equals(ReloadMode.hotRestart));
         expect(config.watchPaths, equals(['lib', 'bin']));
         expect(config.watchExtensions, equals(['.dart', '.yaml']));
-        expect(config.debounceDelay, equals(Duration(milliseconds: 200)));
+        expect(config.ignorePatterns, equals(['.git/', 'build/']));
+        expect(config.debounceDelay, equals(Duration(seconds: 1)));
         expect(config.verbose, isTrue);
+        expect(config.childVmServicePort, equals(12345));
       });
     });
 

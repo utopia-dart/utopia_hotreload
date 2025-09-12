@@ -3,7 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:developer' as developer;
 
-import 'reload_mode.dart';
+import 'reload_config.dart';
 import 'file_watcher.dart';
 import 'service_config.dart';
 import 'multi_service_manager.dart';

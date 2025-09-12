@@ -3,7 +3,7 @@ import 'dart:io';
 import 'dart:convert';
 
 import 'service_config.dart';
-import 'reload_mode.dart';
+import 'reload_config.dart';
 import 'file_watcher.dart';
 import 'keyboard_input_handler.dart';
 
