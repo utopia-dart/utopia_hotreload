@@ -5,6 +5,7 @@ import 'dart:io';
 import '../multi_service_manager.dart';
 import 'metrics_collector.dart';
 import 'reload_history.dart';
+import 'package:path/path.dart' as path;
 
 /// Real-time dashboard service for monitoring hot reload and multi-service development.
 ///
@@ -355,6 +356,28 @@ class DashboardService {
   }
 
   Future<String> _generateDashboardHtml() async {
+    try {
+      // Get the directory of this file to locate the HTML template
+      final packageRoot = path
+          .dirname(path.dirname(path.dirname(Platform.script.toFilePath())));
+      final htmlFile = File(
+          path.join(packageRoot, 'lib', 'src', 'dashboard', 'dashboard.html'));
+
+      if (await htmlFile.exists()) {
+        return await htmlFile.readAsString();
+      } else {
+        // Fallback to embedded HTML if file not found
+        print(
+            '⚠️  Dashboard HTML file not found at ${htmlFile.path}, using fallback');
+        return _getFallbackHtml();
+      }
+    } catch (e) {
+      print('⚠️  Error loading dashboard HTML: $e, using fallback');
+      return _getFallbackHtml();
+    }
+  }
+
+  String _getFallbackHtml() {
     return '''
 <!DOCTYPE html>
 <html lang="en">

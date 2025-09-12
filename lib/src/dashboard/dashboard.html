@@ -1,0 +1,635 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🔥 Utopia Hot Reload Dashboard</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #0f172a;
+            color: #e2e8f0;
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 30px;
+            padding: 20px 0;
+            border-bottom: 2px solid #1e293b;
+        }
+
+        h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            background: linear-gradient(135deg, #f59e0b, #ef4444);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .subtitle {
+            color: #94a3b8;
+            font-size: 1.1rem;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .card {
+            background: #1e293b;
+            border-radius: 12px;
+            padding: 20px;
+            border: 1px solid #334155;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        .card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3);
+        }
+
+        .card-header {
+            display: flex;
+            align-items: center;
+            margin-bottom: 15px;
+            font-weight: 600;
+            font-size: 1.1rem;
+        }
+
+        .card-header .emoji {
+            margin-right: 10px;
+            font-size: 1.3rem;
+        }
+
+        .status-indicator {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+
+        .status-running {
+            background: #10b981;
+        }
+
+        .status-stopped {
+            background: #64748b;
+        }
+
+        .status-error {
+            background: #ef4444;
+        }
+
+        .metric {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 1px solid #334155;
+        }
+
+        .metric:last-child {
+            border-bottom: none;
+        }
+
+        .metric-value {
+            font-weight: 600;
+            color: #f59e0b;
+        }
+
+        .service-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px;
+            margin: 8px 0;
+            background: #0f172a;
+            border-radius: 8px;
+            border: 1px solid #334155;
+        }
+
+        .service-name {
+            font-weight: 600;
+        }
+
+        .service-actions {
+            display: flex;
+            gap: 8px;
+        }
+
+        .btn {
+            padding: 6px 12px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.85rem;
+            font-weight: 500;
+            transition: background-color 0.2s ease;
+        }
+
+        .btn-primary {
+            background: #3b82f6;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #2563eb;
+        }
+
+        .btn-danger {
+            background: #ef4444;
+            color: white;
+        }
+
+        .btn-danger:hover {
+            background: #dc2626;
+        }
+
+        .btn-success {
+            background: #10b981;
+            color: white;
+        }
+
+        .btn-success:hover {
+            background: #059669;
+        }
+
+        .reload-event {
+            padding: 10px;
+            margin: 5px 0;
+            background: #0f172a;
+            border-radius: 6px;
+            border-left: 4px solid #3b82f6;
+            font-size: 0.9rem;
+        }
+
+        .reload-event.failed {
+            border-left-color: #ef4444;
+        }
+
+        .reload-event.restart {
+            border-left-color: #f59e0b;
+        }
+
+        .reload-time {
+            color: #64748b;
+            font-size: 0.8rem;
+        }
+
+        .connection-status {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 10px 15px;
+            border-radius: 6px;
+            font-weight: 600;
+            z-index: 1000;
+        }
+
+        .connected {
+            background: #10b981;
+            color: white;
+        }
+
+        .disconnected {
+            background: #ef4444;
+            color: white;
+        }
+
+        @media (max-width: 768px) {
+            .grid {
+                grid-template-columns: 1fr;
+            }
+
+            .container {
+                padding: 10px;
+            }
+
+            h1 {
+                font-size: 2rem;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="connection-status" id="connectionStatus">
+        🔌 Connecting...
+    </div>
+
+    <div class="container">
+        <header>
+            <h1>🔥 Utopia Hot Reload Dashboard</h1>
+            <p class="subtitle">Real-time monitoring and management for your development environment</p>
+        </header>
+
+        <div class="grid">
+            <!-- System Overview -->
+            <div class="card">
+                <div class="card-header">
+                    <span class="emoji">📊</span>
+                    System Overview
+                </div>
+                <div id="systemOverview">
+                    <div class="metric">
+                        <span>Uptime</span>
+                        <span class="metric-value" id="uptime">--</span>
+                    </div>
+                    <div class="metric">
+                        <span>Active Services</span>
+                        <span class="metric-value" id="activeServices">--</span>
+                    </div>
+                    <div class="metric">
+                        <span>Total Reloads</span>
+                        <span class="metric-value" id="totalReloads">--</span>
+                    </div>
+                    <div class="metric">
+                        <span>Connected Clients</span>
+                        <span class="metric-value" id="connectedClients">--</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Services -->
+            <div class="card">
+                <div class="card-header">
+                    <span class="emoji">⚙️</span>
+                    Services
+                </div>
+                <div id="servicesList">
+                    <!-- Services will be populated by JavaScript -->
+                </div>
+            </div>
+
+            <!-- Performance Metrics -->
+            <div class="card">
+                <div class="card-header">
+                    <span class="emoji">📈</span>
+                    Performance
+                </div>
+                <div id="performanceMetrics">
+                    <div class="metric">
+                        <span>Average Reload Time</span>
+                        <span class="metric-value" id="avgReloadTime">--</span>
+                    </div>
+                    <div class="metric">
+                        <span>Memory Usage</span>
+                        <span class="metric-value" id="memoryUsage">--</span>
+                    </div>
+                    <div class="metric">
+                        <span>File Watches</span>
+                        <span class="metric-value" id="fileWatches">--</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Watched Files -->
+            <div class="card">
+                <div class="card-header">
+                    <span class="emoji">👁️</span>
+                    Watched Files
+                </div>
+                <div id="watchedFilesMetrics">
+                    <div class="metric">
+                        <span>Total Watchers</span>
+                        <span class="metric-value" id="totalWatchers">--</span>
+                    </div>
+                    <div class="metric">
+                        <span>Watch Paths</span>
+                        <span class="metric-value" id="totalWatchPaths">--</span>
+                    </div>
+                    <div class="metric">
+                        <span>Filter Patterns</span>
+                        <span class="metric-value" id="totalPatterns">--</span>
+                    </div>
+                    <div style="margin-top: 10px;">
+                        <button onclick="dashboard.toggleWatchedFilesDetails()" id="watchDetailsToggle">
+                            Show Details
+                        </button>
+                    </div>
+                    <div id="watchedFilesDetails" style="display: none; margin-top: 10px; font-size: 12px;">
+                        <!-- Detailed watched files info will be populated by JavaScript -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- Recent Reload Activity -->
+            <div class="card">
+                <div class="card-header">
+                    <span class="emoji">🔄</span>
+                    Recent Activity
+                </div>
+                <div id="reloadHistory" style="max-height: 300px; overflow-y: auto;">
+                    <!-- Reload events will be populated by JavaScript -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        class DashboardClient {
+            constructor() {
+                this.ws = null;
+                this.reconnectAttempts = 0;
+                this.maxReconnectAttempts = 5;
+                this.reconnectDelay = 1000;
+                this.isConnected = false;
+
+                this.connect();
+            }
+
+            connect() {
+                const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+                const wsUrl = protocol + '//' + window.location.host + '/ws';
+
+                try {
+                    this.ws = new WebSocket(wsUrl);
+
+                    this.ws.onopen = () => {
+                        console.log('Connected to dashboard');
+                        this.isConnected = true;
+                        this.reconnectAttempts = 0;
+                        this.updateConnectionStatus(true);
+                    };
+
+                    this.ws.onmessage = (event) => {
+                        try {
+                            const message = JSON.parse(event.data);
+                            this.handleMessage(message);
+                        } catch (e) {
+                            console.error('Failed to parse message:', e);
+                        }
+                    };
+
+                    this.ws.onclose = () => {
+                        console.log('Disconnected from dashboard');
+                        this.isConnected = false;
+                        this.updateConnectionStatus(false);
+                        this.scheduleReconnect();
+                    };
+
+                    this.ws.onerror = (error) => {
+                        console.error('WebSocket error:', error);
+                    };
+                } catch (e) {
+                    console.error('Failed to connect:', e);
+                    this.scheduleReconnect();
+                }
+            }
+
+            scheduleReconnect() {
+                if (this.reconnectAttempts < this.maxReconnectAttempts) {
+                    this.reconnectAttempts++;
+                    setTimeout(() => this.connect(), this.reconnectDelay);
+                    this.reconnectDelay = Math.min(this.reconnectDelay * 2, 30000);
+                }
+            }
+
+            handleMessage(message) {
+                switch (message.type) {
+                    case 'initial_data':
+                    case 'update':
+                        this.updateDashboard(message.data);
+                        break;
+                    case 'pong':
+                        // Handle ping response
+                        break;
+                }
+            }
+
+            updateConnectionStatus(connected) {
+                const status = document.getElementById('connectionStatus');
+                if (connected) {
+                    status.textContent = '🟢 Connected';
+                    status.className = 'connection-status connected';
+                } else {
+                    status.textContent = '🔴 Disconnected';
+                    status.className = 'connection-status disconnected';
+                }
+            }
+
+            updateDashboard(data) {
+                this.updateSystemOverview(data);
+                this.updateServices(data.services || []);
+                this.updatePerformanceMetrics(data.metrics || {});
+                this.updateWatchedFiles(data.metrics?.serviceMetrics?.watchedFiles || {});
+                this.updateReloadHistory(data.reloadHistory || []);
+            }
+
+            updateSystemOverview(data) {
+                const uptime = data.systemInfo?.uptime || 0;
+                const activeServices = (data.services || []).filter(s => s.status === 'running').length;
+                const totalReloads = (data.reloadHistory || []).length;
+
+                document.getElementById('uptime').textContent = this.formatUptime(uptime);
+                document.getElementById('activeServices').textContent = activeServices;
+                document.getElementById('totalReloads').textContent = totalReloads;
+                document.getElementById('connectedClients').textContent = data.metrics?.connectedClients || 1;
+            }
+
+            updateServices(services) {
+                const container = document.getElementById('servicesList');
+                container.innerHTML = '';
+
+                services.forEach(service => {
+                    const item = document.createElement('div');
+                    item.className = 'service-item';
+
+                    const statusClass = service.status === 'running' ? 'status-running' :
+                        service.status === 'error' ? 'status-error' : 'status-stopped';
+
+                    item.innerHTML = `
+                        <div>
+                            <span class="status-indicator ${statusClass}"></span>
+                            <span class="service-name">${service.name}</span>
+                        </div>
+                        <div class="service-actions">
+                            ${service.status === 'running' ?
+                            `<button class="btn btn-primary" onclick="dashboard.restartService('${service.name}')">Restart</button>
+                                 <button class="btn btn-danger" onclick="dashboard.stopService('${service.name}')">Stop</button>` :
+                            `<button class="btn btn-success" onclick="dashboard.startService('${service.name}')">Start</button>`
+                        }
+                        </div>
+                    `;
+
+                    container.appendChild(item);
+                });
+            }
+
+            updatePerformanceMetrics(metrics) {
+                document.getElementById('avgReloadTime').textContent =
+                    metrics.averageReloadTime ? `${metrics.averageReloadTime}ms` : '--';
+                document.getElementById('memoryUsage').textContent =
+                    metrics.memoryUsage ? this.formatBytes(metrics.memoryUsage) : '--';
+                document.getElementById('fileWatches').textContent =
+                    metrics.fileWatches || '--';
+            }
+
+            updateWatchedFiles(watchedFiles) {
+                document.getElementById('totalWatchers').textContent =
+                    watchedFiles.totalWatchers || 0;
+                document.getElementById('totalWatchPaths').textContent =
+                    watchedFiles.totalWatchPaths || 0;
+                document.getElementById('totalPatterns').textContent =
+                    watchedFiles.totalPatterns || 0;
+
+                // Store watched files data for details view
+                this.watchedFilesData = watchedFiles;
+
+                // Update details if currently shown
+                if (document.getElementById('watchedFilesDetails').style.display !== 'none') {
+                    this.showWatchedFilesDetails();
+                }
+            }
+
+            toggleWatchedFilesDetails() {
+                const details = document.getElementById('watchedFilesDetails');
+                const toggle = document.getElementById('watchDetailsToggle');
+
+                if (details.style.display === 'none') {
+                    this.showWatchedFilesDetails();
+                    details.style.display = 'block';
+                    toggle.textContent = 'Hide Details';
+                } else {
+                    details.style.display = 'none';
+                    toggle.textContent = 'Show Details';
+                }
+            }
+
+            showWatchedFilesDetails() {
+                const container = document.getElementById('watchedFilesDetails');
+                const data = this.watchedFilesData || {};
+
+                let html = '<div style="margin-bottom: 10px;"><strong>Services:</strong></div>';
+
+                (data.services || []).forEach(service => {
+                    const activeStatus = service.isActive ? '🟢' : '🔴';
+                    html += `
+                        <div style="margin-bottom: 8px; padding: 5px; background: rgba(255,255,255,0.05); border-radius: 3px;">
+                            <div><strong>${activeStatus} ${service.serviceName}</strong></div>
+                            <div style="margin-left: 15px; color: #888;">
+                                Watch Paths: ${service.watchPaths.length}<br>
+                                Patterns: ${service.matcher.patternCount}<br>
+                                Include: ${service.matcher.includePatterns}, Exclude: ${service.matcher.excludePatterns}
+                            </div>
+                        </div>
+                    `;
+                });
+
+                if (data.summary && Object.keys(data.summary).length > 0) {
+                    html += '<div style="margin-top: 10px;"><strong>File Types:</strong></div>';
+                    html += '<div style="margin-left: 15px; color: #888;">';
+                    for (const [ext, count] of Object.entries(data.summary)) {
+                        html += `.${ext}: ${count} files<br>`;
+                    }
+                    html += '</div>';
+                }
+
+                container.innerHTML = html;
+            }
+
+            updateReloadHistory(events) {
+                const container = document.getElementById('reloadHistory');
+                container.innerHTML = '';
+
+                events.slice(0, 10).forEach(event => {
+                    const item = document.createElement('div');
+                    item.className = `reload-event ${event.type === 'failed' ? 'failed' :
+                        event.type === 'hot_restart' ? 'restart' : ''}`;
+
+                    const eventIcon = event.type === 'hot_reload' ? '🔥' :
+                        event.type === 'hot_restart' ? '🔄' : '❌';
+
+                    item.innerHTML = `
+                        <div>${eventIcon} ${event.serviceName} - ${event.type.replace('_', ' ')}</div>
+                        <div class="reload-time">${new Date(event.timestamp).toLocaleTimeString()} 
+                             (${event.duration}ms)</div>
+                        ${event.error ? `<div style="color: #ef4444; font-size: 0.8rem;">${event.error}</div>` : ''}
+                    `;
+
+                    container.appendChild(item);
+                });
+            }
+
+            formatUptime(seconds) {
+                const hours = Math.floor(seconds / 3600);
+                const minutes = Math.floor((seconds % 3600) / 60);
+                return `${hours}h ${minutes}m`;
+            }
+
+            formatBytes(bytes) {
+                if (bytes === 0) return '0 B';
+                const k = 1024;
+                const sizes = ['B', 'KB', 'MB', 'GB'];
+                const i = Math.floor(Math.log(bytes) / Math.log(k));
+                return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+            }
+
+            async restartService(serviceName) {
+                try {
+                    await fetch('/api/services/restart', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ serviceName })
+                    });
+                } catch (e) {
+                    console.error('Failed to restart service:', e);
+                }
+            }
+
+            async stopService(serviceName) {
+                try {
+                    await fetch('/api/services/stop', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ serviceName })
+                    });
+                } catch (e) {
+                    console.error('Failed to stop service:', e);
+                }
+            }
+
+            async startService(serviceName) {
+                try {
+                    await fetch('/api/services/start', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ serviceName })
+                    });
+                } catch (e) {
+                    console.error('Failed to start service:', e);
+                }
+            }
+        }
+
+        // Initialize dashboard
+        const dashboard = new DashboardClient();
+
+        // Ping every 30 seconds to keep connection alive
+        setInterval(() => {
+            if (dashboard.isConnected && dashboard.ws) {
+                dashboard.ws.send(JSON.stringify({ type: 'ping' }));
+            }
+        }, 30000);
+    </script>
+</body>
+
+</html>

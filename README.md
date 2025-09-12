@@ -18,7 +18,7 @@ Advanced hot reload and hot restart functionality for Dart applications with tru
 - **📁 File Watching**: Configurable paths and extensions with debouncing
 - **🎯 Smart Fallback**: Graceful error handling with automatic mode switching
 - **🌐 Multi-Service Support**: Run multiple services simultaneously with coordinated reload
-- **📊 Real-Time Dashboard**: Web-based dashboard for monitoring services, metrics, and reload activity
+- **📊 Real-Time Web Dashboard**: Live monitoring, metrics, file watching, and reload history
 - **⚡ Advanced Pattern Matching**: Glob patterns, regex, and predefined presets for sophisticated file filtering
 
 ## Installation
@@ -110,6 +110,56 @@ await DeveloperTools.start(
   verbose: true,
 );
 ```
+
+### 📊 Web Dashboard
+
+Enable the built-in web dashboard for real-time monitoring of your development session:
+
+```dart
+await DeveloperTools.start(
+  script: () async {
+    // Your application code
+  },
+  enableDashboard: true,        // Enable the web dashboard
+  dashboardPort: 9000,          // Dashboard port (defaults to 9000)
+  watchPaths: ['lib', 'bin'],
+);
+```
+
+When enabled, the dashboard provides:
+
+- **📈 Real-time Metrics**: Uptime, memory usage, reload statistics
+- **📁 File Monitoring**: Live view of watched files and recent changes
+- **🔄 Reload History**: Timeline of hot reloads and restarts with performance data
+- **⚙️ Service Management**: Start, stop, and restart services from the web interface
+- **📊 Performance Insights**: Success rates, average reload times, and error tracking
+
+Access the dashboard at: `http://localhost:9000` (or your configured port)
+
+![Dashboard Preview](https://via.placeholder.com/800x400/2d3748/ffffff?text=Dashboard+Preview)
+
+#### Dashboard Features
+
+**Live Metrics Panel:**
+- Application uptime
+- Memory usage tracking
+- Reload success/failure rates
+- Average reload times
+
+**File Watching Panel:**
+- Real-time list of watched files
+- Recent file changes with timestamps
+- File pattern matching status
+
+**Reload History:**
+- Complete timeline of reload events
+- Performance metrics for each reload
+- Error details and diagnostics
+
+**Service Management:**
+- View all running services
+- Control individual services
+- Real-time status updates
 
 ## Flutter-like Development Experience
 

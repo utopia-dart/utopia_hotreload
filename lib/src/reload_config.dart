@@ -53,6 +53,17 @@ class ReloadConfig {
   /// for subsequent restarts during this session.
   final int? childVmServicePort;
 
+  /// Whether to enable the web dashboard for monitoring.
+  ///
+  /// When enabled, starts a web server on [dashboardPort] providing
+  /// real-time monitoring, metrics, and file watching insights.
+  final bool enableDashboard;
+
+  /// Port for the web dashboard server.
+  ///
+  /// Defaults to 9000. Only used when [enableDashboard] is true.
+  final int dashboardPort;
+
   /// Creates a new reload configuration with the specified options.
   const ReloadConfig({
     this.mode = ReloadMode.auto,
@@ -76,6 +87,8 @@ class ReloadConfig {
     this.debounceDelay = const Duration(milliseconds: 500),
     this.verbose = false,
     this.childVmServicePort,
+    this.enableDashboard = false,
+    this.dashboardPort = 9000,
   });
 
   /// Creates a configuration with advanced pattern matching using presets.
@@ -87,6 +100,8 @@ class ReloadConfig {
     this.debounceDelay = const Duration(milliseconds: 500),
     this.verbose = false,
     this.childVmServicePort,
+    this.enableDashboard = false,
+    this.dashboardPort = 9000,
   })  : watchExtensions = const ['.dart'],
         ignorePatterns = const [],
         patternPresets = presets,
@@ -104,6 +119,8 @@ class ReloadConfig {
     this.debounceDelay = const Duration(milliseconds: 500),
     this.verbose = false,
     this.childVmServicePort,
+    this.enableDashboard = false,
+    this.dashboardPort = 9000,
   })  : watchExtensions = const ['.dart'],
         ignorePatterns = const [],
         patternPresets = const [],
