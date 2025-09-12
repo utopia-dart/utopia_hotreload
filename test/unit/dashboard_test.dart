@@ -2,7 +2,6 @@ import 'package:test/test.dart';
 import 'package:utopia_hotreload/src/dashboard/dashboard_service.dart';
 import 'package:utopia_hotreload/src/dashboard/metrics_collector.dart';
 import 'package:utopia_hotreload/src/dashboard/reload_history.dart';
-import 'dart:io';
 
 void main() {
   group('Dashboard Service', () {

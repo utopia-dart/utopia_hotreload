@@ -1,9 +1,8 @@
 import 'package:test/test.dart';
-import '../../lib/src/file_pattern_matcher.dart';
-import '../../lib/src/file_watcher.dart';
-import '../../lib/src/multi_service_manager.dart';
-import '../../lib/src/service_config.dart';
-import '../../lib/src/reload_config.dart';
+import 'package:utopia_hotreload/src/file_pattern_matcher.dart';
+import 'package:utopia_hotreload/src/multi_service_manager.dart';
+import 'package:utopia_hotreload/src/service_config.dart';
+import 'package:utopia_hotreload/src/reload_config.dart';
 
 void main() {
   group('End-to-End Integration Test', () {
