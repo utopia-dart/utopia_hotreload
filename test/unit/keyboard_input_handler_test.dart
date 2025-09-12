@@ -1,4 +1,3 @@
-import 'dart:io';
 import 'package:test/test.dart';
 import 'package:utopia_hotreload/src/keyboard_input_handler.dart';
 
@@ -37,10 +36,8 @@ void main() {
     });
 
     test('should register commands', () {
-      bool commandExecuted = false;
-
       handler.registerCommand('test', () {
-        commandExecuted = true;
+        // Command registered successfully
       });
 
       // Commands are registered but we can't test execution easily in test environment
@@ -88,12 +85,13 @@ void main() {
     });
 
     test('should support callback registration', () async {
-      bool ctrlCCalled = false;
-      bool shutdownCalled = false;
-
       final callbackHandler = KeyboardInputHandler(
-        onCtrlC: () => ctrlCCalled = true,
-        onShutdown: () => shutdownCalled = true,
+        onCtrlC: () {
+          // Ctrl+C callback registered
+        },
+        onShutdown: () {
+          // Shutdown callback registered
+        },
       );
 
       await callbackHandler.start(helpText: null, rawModeEnabled: false);
