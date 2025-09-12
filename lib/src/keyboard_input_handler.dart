@@ -139,16 +139,20 @@ class KeyboardInputHandler {
     await _stdinSubscription?.cancel();
     _stdinSubscription = null;
 
-    // Restore terminal settings
-    if (stdin.hasTerminal) {
-      try {
-        if (!Platform.isWindows) {
-          stdin.echoMode = true;
-          stdin.lineMode = true;
+    // Restore terminal settings with extra safety
+    try {
+      if (stdin.hasTerminal) {
+        try {
+          if (!Platform.isWindows) {
+            stdin.echoMode = true;
+            stdin.lineMode = true;
+          }
+        } catch (e) {
+          // Ignore terminal restoration errors during shutdown
         }
-      } catch (e) {
-        // Ignore terminal restoration errors
       }
+    } catch (e) {
+      // Ignore any errors accessing stdin.hasTerminal during shutdown
     }
   }
 

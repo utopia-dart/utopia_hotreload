@@ -28,7 +28,9 @@ class MultiServiceManager {
   ///
   /// Services are started in priority order (highest priority first).
   /// Each service gets its own file watcher and reload manager.
-  Future<void> startAll() async {
+  ///
+  /// [interactive] - whether to start the interactive command mode (default: true)
+  Future<void> startAll({bool interactive = true}) async {
     print('🚀 Starting multi-service development environment...');
     print('📋 Configured services: ${_services.length}');
     print('');
@@ -46,7 +48,10 @@ class MultiServiceManager {
     print('');
     print('✅ All services started successfully!');
     _printServiceStatus();
-    _startInteractiveMode();
+
+    if (interactive) {
+      _startInteractiveMode();
+    }
   }
 
   /// Starts a specific service by name.

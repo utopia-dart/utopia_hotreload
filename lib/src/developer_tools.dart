@@ -227,6 +227,7 @@ class DeveloperTools {
     ],
     Duration debounceDelay = const Duration(milliseconds: 500),
     bool verbose = false,
+    bool interactive = true,
   }) async {
     if (services.isEmpty) {
       throw ArgumentError('At least one service must be provided');
@@ -244,7 +245,7 @@ class DeveloperTools {
     );
 
     final manager = MultiServiceManager(services, globalConfig);
-    await manager.startAll();
+    await manager.startAll(interactive: interactive);
   }
 
   /// Ensures VM service is enabled for hot reload functionality.
