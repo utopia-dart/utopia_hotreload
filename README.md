@@ -1,61 +1,191 @@
 # Utopia Hot Reload
 
-Advanced hot reload and hot restart functionality for Dart applications with true VM-based hot reload capabilities, similar to Flutter's development experience.
+Advanced hot reload and hot restart for Dart server and CLI applications, with a Flutter-like development experience.
 
 [![Pub Version](https://img.shields.io/pub/v/utopia_hotreload)](https://pub.dev/packages/utopia_hotreload)
 [![Dart SDK Version](https://img.shields.io/badge/dart-%3E%3D3.0.0-blue)](https://dart.dev)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![GitHub Actions](https://github.com/utopia-dart/utopia_hotreload/workflows/CI/badge.svg)](https://github.com/utopia-dart/utopia_hotreload/actions)
-[![Pub Points](https://img.shields.io/pub/points/utopia_hotreload)](https://pub.dev/packages/utopia_hotreload/score)
-[![Pub Popularity](https://img.shields.io/pub/popularity/utopia_hotreload)](https://pub.dev/packages/utopia_hotreload)
 
-## ✨ Features
+## Features
 
-- **🔥 True Hot Reload**: Uses Dart VM service to reload code while preserving application state (like Flutter)
-- **🔄 Hot Restart**: Full process restart when hot reload isn't possible
-- **🚀 Auto Mode**: Intelligently tries hot reload first, falls back to restart
-- **⌨️ Flutter-like Commands**: 'r' for hot reload, 'R' for hot restart, 'q' to quit
-- **📁 File Watching**: Configurable paths and extensions with debouncing
-- **🎯 Smart Fallback**: Graceful error handling with automatic mode switching
-- **🌐 Multi-Service Support**: Run multiple services simultaneously with coordinated reload
-- **📊 Real-Time Web Dashboard**: Live monitoring, metrics, file watching, and reload history
-- **⚡ Advanced Pattern Matching**: Glob patterns, regex, and predefined presets for sophisticated file filtering
+- **True Hot Reload** - Uses Dart VM service to reload code while preserving application state
+- **Hot Restart** - Full process restart when hot reload isn't possible
+- **Auto Mode** - Tries hot reload first, falls back to restart automatically
+- **File Watching** - Configurable paths, extensions, and debouncing
+- **CLI Tool** - Zero-config hot reload for any Dart script
+- **Config File** - Project-wide settings via `hotreload.yaml`
+- **Lifecycle Hooks** - Callbacks for reload/restart events
+- **Multi-Service** - Run multiple services with coordinated reload
+- **Web Dashboard** - Real-time monitoring and metrics
+- **WSL2 Support** - Auto-detects and uses polling on mounted Windows drives
 
 ## Installation
 
 ```yaml
 dev_dependencies:
-  utopia_hotreload: ^2.0.0
+  utopia_hotreload: ^3.0.0
 ```
 
 ## Quick Start
 
+### Option 1: CLI (zero config)
+
+Run any Dart script with hot reload — no code changes needed:
+
+```bash
+dart run utopia_hotreload bin/server.dart
+```
+
+### Option 2: Programmatic API
+
 ```dart
-import 'dart:io';
 import 'package:utopia_hotreload/utopia_hotreload.dart';
 
 void main() async {
   await DeveloperTools.start(
     script: () async {
-      // Your application code here
-      final server = await HttpServer.bind('127.0.0.1', 8080);
-      print('🚀 Server running on http://127.0.0.1:8080');
-      
+      final server = await HttpServer.bind('localhost', 8080);
+      print('Server running on http://localhost:8080');
       await for (final request in server) {
         request.response
-          ..write('Hello from hot reload! Time: ${DateTime.now()}')
+          ..write('Hello! Time: ${DateTime.now()}')
           ..close();
       }
     },
-    watchPaths: ['lib', 'bin'],
-    watchExtensions: ['.dart'],
   );
 }
 ```
 
-## CLI Usage
+That's it. Edit your code, save, and see changes applied instantly.
 
-Run any Dart script with hot reload — no code changes needed:
+## Interactive Commands
+
+While running:
+
+| Key | Action |
+|-----|--------|
+| `r` | Hot reload (preserves state) |
+| `R` | Hot restart (full restart) |
+| `q` | Quit |
+
+## Configuration
+
+There are three ways to configure hot reload, and they layer on top of each other:
+
+### Precedence Order
+
+```
+Code parameters  >  hotreload.yaml  >  Built-in defaults
+```
+
+1. **Parameters passed to `DeveloperTools.start()`** always win
+2. **`hotreload.yaml`** provides project-wide defaults (auto-loaded)
+3. **Built-in defaults** are used when nothing else is specified
+
+### Using `hotreload.yaml` (recommended)
+
+Create a `hotreload.yaml` in your project root:
+
+```yaml
+# Directories to watch
+watch_paths:
+  - lib
+  - bin
+
+# File extensions to monitor
+watch_extensions:
+  - .dart
+  - .yaml
+
+# Patterns to ignore
+ignore_patterns:
+  - .git/
+  - .dart_tool/
+  - build/
+
+# Reload mode: auto, hotReload, or hotRestart
+mode: auto
+
+# Debounce delay in milliseconds
+debounce_ms: 500
+
+# Verbose logging
+verbose: false
+
+# Web dashboard
+dashboard:
+  enabled: false
+  port: 9000
+
+# VM service port (null = auto)
+# vm_service_port: 8181
+
+# Polling-based file watcher (for WSL2/network drives)
+# use_polling: true
+# polling_delay_ms: 1000
+```
+
+Then your code just needs:
+
+```dart
+void main() async {
+  await DeveloperTools.start(
+    script: () async {
+      // Your app code
+    },
+  );
+}
+```
+
+`DeveloperTools.start()` automatically loads `hotreload.yaml` from the project root. No manual loading needed.
+
+### Using code parameters only
+
+If you don't want a config file, pass everything directly:
+
+```dart
+await DeveloperTools.start(
+  script: () async { /* ... */ },
+  watchPaths: ['lib', 'bin'],
+  watchExtensions: ['.dart', '.yaml'],
+  debounceDelay: Duration(milliseconds: 300),
+  verbose: true,
+);
+```
+
+### Mixing both (overriding specific values)
+
+Use `hotreload.yaml` for project-wide defaults and override specific values in code:
+
+```yaml
+# hotreload.yaml
+watch_paths:
+  - lib
+  - bin
+verbose: false
+debounce_ms: 500
+```
+
+```dart
+await DeveloperTools.start(
+  script: () async { /* ... */ },
+  verbose: true,  // overrides yaml's false
+  // watch_paths and debounce come from hotreload.yaml
+);
+```
+
+Only the parameters you explicitly pass will override the YAML values.
+
+### Custom config file path
+
+```dart
+await DeveloperTools.start(
+  script: () async { /* ... */ },
+  configFile: 'config/dev.yaml',
+);
+```
+
+## CLI Usage
 
 ```bash
 # Basic usage
@@ -71,7 +201,7 @@ dart run utopia_hotreload -e .dart,.yaml --verbose bin/server.dart
 dart run utopia_hotreload bin/server.dart -- --port 8080
 ```
 
-### CLI Options
+The CLI also loads `hotreload.yaml` automatically if present.
 
 | Option | Short | Default | Description |
 |--------|-------|---------|-------------|
@@ -80,535 +210,129 @@ dart run utopia_hotreload bin/server.dart -- --port 8080
 | `--debounce` | | `500` | Debounce delay in milliseconds |
 | `--verbose` | `-v` | `false` | Enable verbose logging |
 | `--help` | `-h` | | Show help message |
-| `--version` | | | Show version |
 
-## Usage
+## Lifecycle Hooks
 
-### Basic Usage
-
-The API is designed to be simple and Flutter-like:
-
-```dart
-import 'package:utopia_hotreload/utopia_hotreload.dart';
-
-void main() async {
-  await DeveloperTools.start(
-    script: () async {
-      // Your application code here
-    },
-  );
-}
-```
-
-### With Utopia HTTP
-
-```dart
-import 'dart:io';
-import 'package:utopia_http/utopia_http.dart';
-import 'package:utopia_hotreload/utopia_hotreload.dart';
-
-void main() async {
-  await DeveloperTools.start(
-    script: () async {
-      final app = Http(ShelfServer(InternetAddress.anyIPv4, 8080));
-      
-      app.get('/').inject('response').action((Response response) {
-        response.text('Hello with hot reload! 🔥');
-        return response;
-      });
-      
-      await app.start();
-    },
-    watchPaths: ['lib', 'example'],
-    watchExtensions: ['.dart'],
-  );
-}
-```
-
-### Advanced Configuration
+React to reload and restart events:
 
 ```dart
 await DeveloperTools.start(
-  script: () async {
-    // Your server code
-  },
-  watchPaths: ['lib', 'bin', 'web'],
-  watchExtensions: ['.dart', '.yaml'],
-  ignorePatterns: ['**/.dart_tool/**', '**/build/**'],
-  debounceDelay: Duration(milliseconds: 300),
-  verbose: true,
+  script: () async { /* ... */ },
+  hooks: LifecycleHooks(
+    onBeforeReload: () async {
+      print('About to reload...');
+      return true; // return false to cancel the reload
+    },
+    onAfterReload: () async {
+      print('Reload complete!');
+    },
+    onBeforeRestart: () async {
+      print('Closing connections before restart...');
+    },
+    onAfterRestart: () async {
+      print('Restarted!');
+    },
+    onFileChanged: (path) async {
+      print('File changed: $path');
+    },
+    onError: (error) async {
+      print('Reload error: $error');
+    },
+  ),
 );
 ```
 
-### 📊 Web Dashboard
+## Web Dashboard
 
-Enable the built-in web dashboard for real-time monitoring of your development session:
+Enable the built-in web dashboard for real-time monitoring:
 
 ```dart
 await DeveloperTools.start(
-  script: () async {
-    // Your application code
-  },
-  enableDashboard: true,        // Enable the web dashboard
-  dashboardPort: 9000,          // Dashboard port (defaults to 9000)
-  watchPaths: ['lib', 'bin'],
+  script: () async { /* ... */ },
+  enableDashboard: true,
+  dashboardPort: 9000,
 );
 ```
 
-When enabled, the dashboard provides:
-
-- **📈 Real-time Metrics**: Uptime, memory usage, reload statistics
-- **📁 File Monitoring**: Live view of watched files and recent changes
-- **🔄 Reload History**: Timeline of hot reloads and restarts with performance data
-- **⚙️ Service Management**: Start, stop, and restart services from the web interface
-- **📊 Performance Insights**: Success rates, average reload times, and error tracking
-
-Access the dashboard at: `http://localhost:9000` (or your configured port)
-
-![Dashboard Preview](https://via.placeholder.com/800x400/2d3748/ffffff?text=Dashboard+Preview)
-
-#### Dashboard Features
-
-**Live Metrics Panel:**
-- Application uptime
-- Memory usage tracking
-- Reload success/failure rates
-- Average reload times
-
-**File Watching Panel:**
-- Real-time list of watched files
-- Recent file changes with timestamps
-- File pattern matching status
-
-**Reload History:**
-- Complete timeline of reload events
-- Performance metrics for each reload
-- Error details and diagnostics
-
-**Service Management:**
-- View all running services
-- Control individual services
-- Real-time status updates
-
-## Configuration File
-
-Create a `hotreload.yaml` in your project root to configure hot reload without code changes:
+Or in `hotreload.yaml`:
 
 ```yaml
-watch_paths:
-  - lib
-  - bin
-
-watch_extensions:
-  - .dart
-  - .yaml
-
-ignore_patterns:
-  - .git/
-  - build/
-
-mode: auto
-debounce_ms: 500
-verbose: false
-
 dashboard:
-  enabled: false
+  enabled: true
   port: 9000
 ```
 
-Load it in your code:
+The dashboard provides live metrics, reload history, file watching status, and service management at `http://localhost:9000`.
+
+## Multi-Service Development
+
+Run multiple services simultaneously with coordinated reload:
 
 ```dart
-import 'package:utopia_hotreload/utopia_hotreload.dart';
-
-void main() async {
-  final config = ReloadConfigFile.load(); // loads hotreload.yaml
-
-  await DeveloperTools.start(
-    script: runServer,
-    watchPaths: config?.watchPaths ?? ['lib'],
-    watchExtensions: config?.watchExtensions ?? ['.dart'],
-    verbose: config?.verbose ?? false,
-  );
-}
+await DeveloperTools.startMultiple([
+  ServiceConfig(
+    name: 'api',
+    script: () async { /* API server */ },
+    watchPaths: ['lib/api'],
+  ),
+  ServiceConfig(
+    name: 'web',
+    script: () async { /* Web server */ },
+    watchPaths: ['lib/web'],
+  ),
+]);
 ```
 
-You can also merge file config with programmatic overrides (programmatic values take precedence):
+Each service gets its own VM service connection for independent hot reload.
+
+## WSL2 / Network Drives
+
+On WSL2, native file watching (`inotify`) doesn't work on mounted Windows drives (`/mnt/`). The package auto-detects this and switches to polling.
+
+To force polling manually:
 
 ```dart
-final fileConfig = ReloadConfigFile.load();
-if (fileConfig != null) {
-  final config = ReloadConfigFile.merge(fileConfig, verbose: true);
-  // Use merged config...
-}
+await DeveloperTools.start(
+  script: () async { /* ... */ },
+  usePolling: true,
+);
 ```
 
-Both `snake_case` and `camelCase` field names are supported in the YAML file. See `example/hotreload.yaml` for a complete example.
+Or in `hotreload.yaml`:
 
-## Flutter-like Development Experience
-
-When you run your application, you'll see:
-
+```yaml
+use_polling: true
+polling_delay_ms: 1000
 ```
-🔥 Hot reload enabled. Press:
-  r + Enter: Hot reload
-  R + Enter: Hot restart  
-  q + Enter: Quit
-
-🚀 Starting application with auto hot reload...
-📁 Watching paths: [lib, bin]
-📄 Watching extensions: [.dart]
-
-💡 Commands available:
-  r + Enter: Hot reload (preserves state)
-  R + Enter: Hot restart (full restart)  
-  q + Enter: Quit
-
-🌐 Server running on http://127.0.0.1:8080
-```
-
-### Commands
-
-- **`r` + Enter**: Hot reload - Preserves application state, faster
-- **`R` + Enter**: Hot restart - Full application restart, more reliable  
-- **`q` + Enter**: Quit the development server
-
-### Auto Mode Behavior
-
-The package always uses **auto mode** (like Flutter), which:
-
-1. **Tries hot reload first** - Attempts to preserve state using Dart VM service
-2. **Falls back to hot restart** - If hot reload fails or isn't available
-3. **Provides feedback** - Shows which mode was used and why
 
 ## How It Works
 
-### True Hot Reload ✨
-- **Uses Dart VM Service's `reloadSources()` API** - Updates code in the running process
-- **Preserves application state** - Variables, connections, and server instances remain intact
-- **Same port, same PID** - Server continues running without interruption
-- **Requires `--enable-vm-service` flag** - Automatically enabled by the package
-- **Similar to Flutter's hot reload** - Instant code updates with state preservation
+1. **Hot Reload** - Uses `vm_service` `reloadSources()` API to update code in the running process. Variables, connections, and server instances remain intact. Same port, same PID.
 
-### Hot Restart 🔄
-- **Terminates and restarts the entire Dart process** - Fresh compilation and clean state
-- **Loses all application state** - Variables reset, connections closed, new server instance
-- **New port, new PID** - Complete process restart
-- **More compatible across different scenarios** - Guaranteed to pick up all code changes
-- **Used as fallback** - When hot reload fails or for structural changes
+2. **Hot Restart** - Terminates and restarts the Dart process. Clean state, new connections. Used as fallback when hot reload fails.
 
-### Automatic Fallback
-The package intelligently chooses the best reload method:
+3. **Auto Mode** (default) - Tries hot reload first. If it fails (e.g., structural changes), automatically falls back to hot restart.
 
-```
-📝 File changed: lib/server.dart
-🔥 Performing true hot reload...
-✅ Hot reload completed - code updated in running process!
-```
-
-For structural changes that can't be hot reloaded:
-```
-📝 File changed: lib/server.dart
-🔥 Performing true hot reload...
-❌ Hot reload failed: Structural changes detected
-🔄 Hot reload not available, performing hot restart...
-🔄 Performing true hot restart (restarting entire process)...
-✅ Hot restart completed
-```
-
-## Configuration Options
-
-### `DeveloperTools.start()` Parameters
+## `DeveloperTools.start()` Parameters
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `script` | `Function` | **required** | Your application entry point |
-| `watchPaths` | `List<String>` | `['lib']` | Directories to watch for changes |
-| `watchExtensions` | `List<String>` | `['.dart']` | File extensions to monitor |
-| `ignorePatterns` | `List<String>` | See below | Patterns to ignore |
-| `debounceDelay` | `Duration` | `500ms` | Delay before triggering reload |
-| `verbose` | `bool` | `false` | Enable detailed logging |
-
-### Default Ignore Patterns
-
-```dart
-[
-  '.git/',
-  '.dart_tool/',
-  'build/',
-  'test/',
-  '.packages',
-  'pubspec.lock',
-  '.vscode/',
-  '.idea/',
-  '*.log',
-  '*.tmp',
-]
-```
-
-## 📊 Real-Time Dashboard
-
-The package includes a powerful real-time dashboard for monitoring your development environment when using multi-service mode.
-
-### Features
-
-- **🔴 Live Service Monitoring**: Real-time status of all running services
-- **📈 Performance Metrics**: Memory usage, reload times, and success rates
-- **📋 Reload History**: Detailed timeline of all hot reload and restart events
-- **⚡ Interactive Management**: Start, stop, and restart services from the web interface
-- **📊 Analytics**: Service performance breakdown and trends
-- **🔄 Auto-Updates**: WebSocket-based live updates every 2 seconds
-
-### Usage
-
-The dashboard is automatically enabled for multi-service development:
-
-```dart
-import 'package:utopia_hotreload/utopia_hotreload.dart';
-
-void main() async {
-  await DeveloperTools.startMultiple([
-    ServiceConfig(
-      name: 'api-server',
-      script: runApiServer,
-      displayName: 'API Server',
-    ),
-    ServiceConfig(
-      name: 'web-server', 
-      script: runWebServer,
-      displayName: 'Web Server',
-    ),
-  ], 
-  enableDashboard: true,     // Enable dashboard (default: true)
-  dashboardPort: 9000,       // Dashboard port (default: 9000)
-  dashboardHost: 'localhost', // Dashboard host (default: 'localhost')
-  );
-}
-```
-
-### Accessing the Dashboard
-
-Once your multi-service environment starts, the dashboard will be available at:
-
-```
-📊 Dashboard available at: http://localhost:9000
-```
-
-### Dashboard Features
-
-#### System Overview
-- **Uptime**: Total development session time
-- **Active Services**: Number of currently running services
-- **Total Reloads**: Count of all reload operations performed
-- **Connected Clients**: Number of dashboard connections
-
-#### Service Management
-- **Real-time Status**: See which services are running, stopped, or failed
-- **Interactive Controls**: Start, stop, and restart individual services
-- **Priority Display**: View service startup priority and auto-start settings
-- **Configuration Info**: Watch paths, environment variables, and settings
-
-#### Performance Monitoring
-- **Average Reload Time**: Performance metrics for hot reload operations
-- **Memory Usage**: Current memory consumption of the development process
-- **File Watches**: Number of active file system monitors
-- **Success Rate**: Percentage of successful vs failed reload attempts
-
-#### Activity Timeline
-- **Recent Reload Events**: Live feed of hot reload and restart operations
-- **Error Tracking**: Detailed error messages when reloads fail
-- **Performance Trends**: Visual indicators of reload performance over time
-- **Service-Specific History**: Filter events by individual services
-
-### API Endpoints
-
-The dashboard also provides REST API endpoints for integration:
-
-- `GET /api/status` - Basic dashboard status
-- `GET /api/metrics` - Performance metrics
-- `GET /api/services` - Service list and status
-- `GET /api/reload-history` - Reload event history
-- `POST /api/services/restart` - Restart a service
-- `POST /api/services/stop` - Stop a service  
-- `POST /api/services/start` - Start a service
-
-## Examples
-
-### Multi-Service Development
-
-```dart
-import 'dart:io';
-import 'package:utopia_hotreload/utopia_hotreload.dart';
-
-void main() async {
-  await DeveloperTools.startMultiple([
-    // API Server
-    ServiceConfig(
-      name: 'api',
-      script: () async {
-        final server = await HttpServer.bind('localhost', 3000);
-        await for (final request in server) {
-          request.response
-            ..headers.contentType = ContentType.json
-            ..write('{"message": "API is running", "time": "${DateTime.now()}"}')
-            ..close();
-        }
-      },
-      displayName: 'API Server',
-      watchPaths: ['lib/api'],
-      priority: 10,
-    ),
-    
-    // Web Server  
-    ServiceConfig(
-      name: 'web',
-      script: () async {
-        final server = await HttpServer.bind('localhost', 8080);
-        await for (final request in server) {
-          request.response
-            ..headers.contentType = ContentType.html
-            ..write('<h1>Web Server</h1><p>Dashboard: <a href="http://localhost:9000">View Dashboard</a></p>')
-            ..close();
-        }
-      },
-      displayName: 'Web Server',
-      watchPaths: ['lib/web'],
-      priority: 5,
-    ),
-  ]);
-}
-```
-
-### Simple HTTP Server
-
-```dart
-import 'dart:io';
-import 'package:utopia_hotreload/utopia_hotreload.dart';
-
-void main() async {
-  await DeveloperTools.start(
-    script: () async {
-      final server = await HttpServer.bind('127.0.0.1', 8080);
-      
-      await for (final request in server) {
-        request.response
-          ..headers.contentType = ContentType.html
-          ..write('''
-            <h1>Hot Reload Demo</h1>
-            <p>Time: ${DateTime.now()}</p>
-            <p>Try editing this file!</p>
-          ''')
-          ..close();
-      }
-    },
-  );
-}
-```
-
-### Console Application
-
-```dart
-import 'dart:io';
-import 'package:utopia_hotreload/utopia_hotreload.dart';
-
-void main() async {
-  await DeveloperTools.start(
-    script: () async {
-      print('🚀 Console app with hot reload');
-      print('Current time: ${DateTime.now()}');
-      
-      // Keep running
-      await stdin.first;
-    },
-    verbose: true,
-  );
-}
-```
-
-## Migration from HttpDev
-
-If you were using `HttpDev` from `utopia_http`:
-
-### Before (HttpDev)
-```dart
-import 'package:utopia_http/utopia_http.dart';
-
-void main() async {
-  await HttpDev.start(
-    script: () => runServer(),
-    watchPaths: ['lib'],
-  );
-}
-```
-
-### After (DeveloperTools)
-```dart
-import 'package:utopia_hotreload/utopia_hotreload.dart';
-
-void main() async {
-  await DeveloperTools.start(
-    script: () => runServer(),
-    watchPaths: ['lib'],
-  );
-}
-```
+| `script` | `Future<void> Function()` | required | Your application entry point |
+| `watchPaths` | `List<String>?` | YAML or `['lib']` | Directories to watch |
+| `watchExtensions` | `List<String>?` | YAML or `['.dart']` | File extensions to monitor |
+| `ignorePatterns` | `List<String>?` | YAML or common patterns | Patterns to ignore |
+| `debounceDelay` | `Duration?` | YAML or `500ms` | Delay before triggering reload |
+| `verbose` | `bool?` | YAML or `false` | Enable detailed logging |
+| `enableDashboard` | `bool?` | YAML or `false` | Enable web dashboard |
+| `dashboardPort` | `int?` | YAML or `9000` | Dashboard port |
+| `usePolling` | `bool?` | YAML or auto-detect | Force polling file watcher |
+| `configFile` | `String?` | `hotreload.yaml` | Custom config file path |
+| `hooks` | `LifecycleHooks?` | none | Reload/restart callbacks |
+| `childVmServicePort` | `int?` | YAML or auto | VM service port |
 
 ## Requirements
 
 - Dart SDK 3.0.0 or higher
-- For hot reload: Dart VM service support (automatically enabled)
-
-## Troubleshooting
-
-### Hot Reload Not Working
-
-If hot reload consistently fails:
-
-1. **Check for structural changes** - Hot reload can't handle class/method signature changes
-2. **Use hot restart** - Press `R` + Enter for structural changes
-3. **Enable verbose mode** - Set `verbose: true` to see detailed error messages
-
-### File Changes Not Detected
-
-1. **Check watch paths** - Ensure your files are in the specified `watchPaths`
-2. **Check extensions** - Make sure file extensions are in `watchExtensions`
-3. **Check ignore patterns** - Verify files aren't excluded by `ignorePatterns`
-
-### Performance Issues
-
-1. **Reduce watch scope** - Watch only necessary directories
-2. **Increase debounce delay** - Set higher `debounceDelay` for slower systems
-3. **Add ignore patterns** - Exclude large directories like `node_modules`
-
-## Advanced Usage
-
-### Custom Error Handling
-
-The auto mode provides automatic fallback, but you can also handle specific scenarios:
-
-```dart
-await DeveloperTools.start(
-  script: () async {
-    try {
-      // Your application code
-    } catch (e) {
-      print('Application error: $e');
-      // Handle gracefully
-    }
-  },
-  verbose: true, // See detailed reload information
-);
-```
-
-### Multiple File Types
-
-```dart
-await DeveloperTools.start(
-  script: () => runServer(),
-  watchPaths: ['lib', 'web', 'config'],
-  watchExtensions: ['.dart', '.yaml', '.json'],
-);
-```
 
 ## License
 
