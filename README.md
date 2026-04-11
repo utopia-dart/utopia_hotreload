@@ -161,6 +161,61 @@ Access the dashboard at: `http://localhost:9000` (or your configured port)
 - Control individual services
 - Real-time status updates
 
+## Configuration File
+
+Create a `hotreload.yaml` in your project root to configure hot reload without code changes:
+
+```yaml
+watch_paths:
+  - lib
+  - bin
+
+watch_extensions:
+  - .dart
+  - .yaml
+
+ignore_patterns:
+  - .git/
+  - build/
+
+mode: auto
+debounce_ms: 500
+verbose: false
+
+dashboard:
+  enabled: false
+  port: 9000
+```
+
+Load it in your code:
+
+```dart
+import 'package:utopia_hotreload/utopia_hotreload.dart';
+
+void main() async {
+  final config = ReloadConfigFile.load(); // loads hotreload.yaml
+
+  await DeveloperTools.start(
+    script: runServer,
+    watchPaths: config?.watchPaths ?? ['lib'],
+    watchExtensions: config?.watchExtensions ?? ['.dart'],
+    verbose: config?.verbose ?? false,
+  );
+}
+```
+
+You can also merge file config with programmatic overrides (programmatic values take precedence):
+
+```dart
+final fileConfig = ReloadConfigFile.load();
+if (fileConfig != null) {
+  final config = ReloadConfigFile.merge(fileConfig, verbose: true);
+  // Use merged config...
+}
+```
+
+Both `snake_case` and `camelCase` field names are supported in the YAML file. See `example/hotreload.yaml` for a complete example.
+
 ## Flutter-like Development Experience
 
 When you run your application, you'll see:
