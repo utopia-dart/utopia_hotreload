@@ -25,7 +25,7 @@ Advanced hot reload and hot restart functionality for Dart applications with tru
 
 ```yaml
 dev_dependencies:
-  utopia_hotreload: ^1.0.0
+  utopia_hotreload: ^2.0.0
 ```
 
 ## Quick Start

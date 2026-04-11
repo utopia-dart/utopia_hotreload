@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 import 'package:path/path.dart' as path;
+import 'package:watcher/watcher.dart';
 
 import 'reload_config.dart';
 import 'file_pattern_matcher.dart';
@@ -32,7 +33,8 @@ class HotReloadFileWatcher {
       if (await dir.exists()) {
         print('👁️  Watching directory: ${dir.absolute.path}');
 
-        final watcher = dir.watch(recursive: true).listen((event) {
+        final directoryWatcher = DirectoryWatcher(dir.absolute.path);
+        final watcher = directoryWatcher.events.listen((event) {
           final filePath = event.path;
 
           if (config.verbose) {
@@ -61,7 +63,7 @@ class HotReloadFileWatcher {
             onFileChanged(filePath);
           });
         }, onError: (error) {
-          print('❌ File watcher error for $path: $error');
+          print('❌ File watcher error for ${dir.path}: $error');
         });
 
         _watchers.add(watcher);
