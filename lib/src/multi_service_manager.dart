@@ -20,6 +20,7 @@ class MultiServiceManager {
   final Map<String, ServiceInstance> _runningServices = {};
   final Map<String, HotReloadFileWatcher> _watchers = {};
   final List<StreamSubscription> _subscriptions = [];
+  final Set<String> _restartingServices = {};
 
   KeyboardInputHandler? _keyboardHandler;
   bool _isShuttingDown = false;
@@ -238,12 +239,12 @@ class MultiServiceManager {
     ];
 
     final environment = Map<String, String>.from(Platform.environment);
+    environment.addAll(service.environment);
     environment['UTOPIA_DEV_MODE'] = 'true';
     environment['UTOPIA_SERVICE_NAME'] = service.name;
-    environment.addAll(service.environment);
 
     final process = await Process.start(
-      Platform.resolvedExecutable,
+      Platform.executable,
       args,
       workingDirectory: service.workingDirectory ?? Directory.current.path,
       environment: environment,
@@ -280,6 +281,7 @@ class MultiServiceManager {
       String serviceName, String httpUri) async {
     final instance = _runningServices[serviceName];
     if (instance == null || instance.vmConnected) return;
+    instance.vmConnected = true;
     try {
       var wsUri = httpUri.replaceFirst('http', 'ws');
       if (!wsUri.endsWith('/ws')) {
@@ -291,15 +293,16 @@ class MultiServiceManager {
       if (vm.isolates?.isNotEmpty == true) {
         instance.isolateId = vm.isolates!.first.id!;
         instance.vmService = service;
-        instance.vmConnected = true;
         print(
             '✅ [${instance.config.effectiveDisplayName}] Connected to VM service - hot reload enabled');
       } else {
+        instance.vmConnected = false;
         try {
           await service.dispose();
         } catch (_) {}
       }
     } catch (e) {
+      instance.vmConnected = false;
       if (_globalConfig.verbose) {
         print(
             '⚠️  [${instance.config.effectiveDisplayName}] Failed to connect to VM service: $e');
@@ -323,12 +326,7 @@ class MultiServiceManager {
         } catch (_) {}
       }
 
-      instance.process.kill();
-      try {
-        await instance.process.exitCode.timeout(Duration(seconds: 2));
-      } catch (e) {
-        instance.process.kill(ProcessSignal.sigkill);
-      }
+      await _killProcess(instance.process);
     }
 
     if (watcher != null) {
@@ -389,12 +387,7 @@ class MultiServiceManager {
       }
 
       // Stop the current process
-      instance.process.kill();
-      try {
-        await instance.process.exitCode.timeout(Duration(seconds: 2));
-      } catch (e) {
-        instance.process.kill(ProcessSignal.sigkill);
-      }
+      await _killProcess(instance.process);
 
       // Start a new process
       final newProcess = await _startServiceProcess(instance.config);
@@ -428,9 +421,14 @@ class MultiServiceManager {
 
   void _triggerServiceRestart(String serviceName) {
     final instance = _runningServices[serviceName];
-    if (instance != null) {
-      _restartService(instance);
-    }
+    if (instance == null) return;
+    if (_restartingServices.contains(serviceName)) return;
+    _restartingServices.add(serviceName);
+    _restartService(instance).catchError((e) {
+      print('❌ [$serviceName] Restart failed: $e');
+    }).whenComplete(() {
+      _restartingServices.remove(serviceName);
+    });
   }
 
   ReloadConfig _createServiceReloadConfig(ServiceConfig service) {
@@ -503,8 +501,31 @@ class MultiServiceManager {
   }
 
   void _handleShutdown() {
-    shutdown();
-    exit(0);
+    shutdown().then((_) => exit(0));
+  }
+
+  Future<void> _killProcess(Process process) async {
+    if (Platform.isWindows) {
+      process.kill();
+      try {
+        await process.exitCode.timeout(Duration(seconds: 2));
+      } catch (_) {}
+    } else {
+      try {
+        process.kill(ProcessSignal.sigterm);
+      } catch (_) {
+        process.kill();
+      }
+      try {
+        await process.exitCode.timeout(Duration(seconds: 2));
+      } catch (_) {
+        try {
+          process.kill(ProcessSignal.sigkill);
+        } catch (_) {
+          process.kill();
+        }
+      }
+    }
   }
 
   void _listAndStopServices() {
