@@ -7,6 +7,8 @@ import 'reload_config.dart';
 import 'file_watcher.dart';
 import 'keyboard_input_handler.dart';
 import 'dashboard/dashboard_service.dart';
+import 'package:vm_service/vm_service.dart';
+import 'package:vm_service/vm_service_io.dart';
 
 /// Manages multiple services in a development environment with coordinated hot reload.
 ///
@@ -219,60 +221,90 @@ class MultiServiceManager {
   }
 
   Future<Process> _startServiceProcess(ServiceConfig service) async {
-    // Create a temporary script file for this service
-    final tempDir = Directory.systemTemp.createTempSync('utopia_service_');
-    final scriptFile = File('${tempDir.path}/service_${service.name}.dart');
+    final scriptPath = Platform.script.toFilePath();
 
-    // Write a script that calls the service function
-    final scriptContent = '''
-import 'dart:async';
-import 'dart:io';
+    final parentArgs = Platform.executableArguments.where((arg) {
+      return !(arg.startsWith('--enable-vm-service') ||
+          arg.startsWith('--observe') ||
+          arg.startsWith('--disable-service-auth-codes'));
+    }).toList();
 
-// Import user's script (this is a simplified approach)
-// In a real implementation, we'd use a more sophisticated approach
-Future<void> main() async {
-  print('🚀 Starting service: ${service.effectiveDisplayName}');
-  
-  // Call the service script
-  // Note: This is a placeholder - in a real implementation,
-  // we'd need a more sophisticated way to serialize and call the function
-  await runServiceScript();
-}
+    final vmPort = service.vmServicePort ?? 0;
+    final args = [
+      '--enable-vm-service=$vmPort',
+      '--disable-service-auth-codes',
+      ...parentArgs,
+      scriptPath,
+    ];
 
-Future<void> runServiceScript() async {
-  // Placeholder - this would be replaced with the actual service script
-  print('Service ${service.name} is running...');
-  
-  // Keep the service running
-  while (true) {
-    await Future.delayed(Duration(seconds: 1));
-  }
-}
-''';
+    final environment = Map<String, String>.from(Platform.environment);
+    environment['UTOPIA_DEV_MODE'] = 'true';
+    environment['UTOPIA_SERVICE_NAME'] = service.name;
+    environment.addAll(service.environment);
 
-    await scriptFile.writeAsString(scriptContent);
-
-    // Start the process
     final process = await Process.start(
       Platform.resolvedExecutable,
-      [scriptFile.path],
+      args,
       workingDirectory: service.workingDirectory ?? Directory.current.path,
-      environment: {
-        ...Platform.environment,
-        ...service.environment,
-      },
+      environment: environment,
     );
 
-    // Monitor process output
-    process.stdout.transform(utf8.decoder).listen((data) {
-      print('[${service.effectiveDisplayName}] $data');
+    process.stdout
+        .transform(utf8.decoder)
+        .transform(const LineSplitter())
+        .listen((line) {
+      print('[${service.effectiveDisplayName}] $line');
+      _maybeCaptureVmServiceUri(service.name, line);
     });
 
-    process.stderr.transform(utf8.decoder).listen((data) {
-      print('[${service.effectiveDisplayName}] ERROR: $data');
+    process.stderr
+        .transform(utf8.decoder)
+        .transform(const LineSplitter())
+        .listen((line) {
+      print('[${service.effectiveDisplayName}] ERROR: $line');
+      _maybeCaptureVmServiceUri(service.name, line);
     });
 
     return process;
+  }
+
+  void _maybeCaptureVmServiceUri(String serviceName, String line) {
+    final marker = 'The Dart VM service is listening on ';
+    final idx = line.indexOf(marker);
+    if (idx == -1) return;
+    final uriStr = line.substring(idx + marker.length).trim();
+    _connectToChildVmService(serviceName, uriStr);
+  }
+
+  Future<void> _connectToChildVmService(
+      String serviceName, String httpUri) async {
+    final instance = _runningServices[serviceName];
+    if (instance == null || instance.vmConnected) return;
+    try {
+      var wsUri = httpUri.replaceFirst('http', 'ws');
+      if (!wsUri.endsWith('/ws')) {
+        if (!wsUri.endsWith('/')) wsUri = '$wsUri/';
+        wsUri = '${wsUri}ws';
+      }
+      final service = await vmServiceConnectUri(wsUri);
+      final vm = await service.getVM();
+      if (vm.isolates?.isNotEmpty == true) {
+        instance.isolateId = vm.isolates!.first.id!;
+        instance.vmService = service;
+        instance.vmConnected = true;
+        print(
+            '✅ [${instance.config.effectiveDisplayName}] Connected to VM service - hot reload enabled');
+      } else {
+        try {
+          await service.dispose();
+        } catch (_) {}
+      }
+    } catch (e) {
+      if (_globalConfig.verbose) {
+        print(
+            '⚠️  [${instance.config.effectiveDisplayName}] Failed to connect to VM service: $e');
+      }
+    }
   }
 
   Future<void> _stopService(String serviceName) async {
@@ -280,6 +312,17 @@ Future<void> runServiceScript() async {
     final watcher = _watchers.remove(serviceName);
 
     if (instance != null) {
+      // Clean up VM service connection
+      if (instance.vmService != null) {
+        try {
+          final svc = instance.vmService;
+          instance.vmService = null;
+          instance.vmConnected = false;
+          instance.isolateId = null;
+          await svc?.dispose();
+        } catch (_) {}
+      }
+
       instance.process.kill();
       try {
         await instance.process.exitCode.timeout(Duration(seconds: 2));
@@ -296,11 +339,55 @@ Future<void> runServiceScript() async {
   }
 
   Future<void> _restartService(ServiceInstance instance) async {
-    print('🔄 Restarting service: ${instance.config.effectiveDisplayName}');
-
     final stopwatch = Stopwatch()..start();
 
+    // Try hot reload first if VM service is connected
+    if (instance.vmConnected &&
+        instance.vmService != null &&
+        instance.isolateId != null) {
+      try {
+        print(
+            '🔥 [${instance.config.effectiveDisplayName}] Performing hot reload...');
+        final report =
+            await instance.vmService!.reloadSources(instance.isolateId!);
+        stopwatch.stop();
+
+        if (report.success == true) {
+          print(
+              '✅ [${instance.config.effectiveDisplayName}] Hot reload completed');
+          _recordReloadEvent(
+            serviceName: instance.config.name,
+            type: 'hot_reload',
+            duration: stopwatch.elapsed,
+          );
+          return;
+        }
+        print(
+            '⚠️  [${instance.config.effectiveDisplayName}] Hot reload failed, falling back to restart...');
+      } catch (e) {
+        print(
+            '⚠️  [${instance.config.effectiveDisplayName}] Hot reload error: $e, falling back to restart...');
+      }
+      stopwatch.reset();
+      stopwatch.start();
+    }
+
+    // Fall back to full process restart
+    print(
+        '🔄 [${instance.config.effectiveDisplayName}] Performing hot restart...');
+
     try {
+      // Clean up VM service connection
+      if (instance.vmService != null) {
+        try {
+          final svc = instance.vmService;
+          instance.vmService = null;
+          instance.vmConnected = false;
+          instance.isolateId = null;
+          await svc?.dispose();
+        } catch (_) {}
+      }
+
       // Stop the current process
       instance.process.kill();
       try {
@@ -315,18 +402,17 @@ Future<void> runServiceScript() async {
 
       stopwatch.stop();
 
-      // Record successful restart
       _recordReloadEvent(
         serviceName: instance.config.name,
         type: 'hot_restart',
         duration: stopwatch.elapsed,
       );
 
-      print('✅ Service restarted: ${instance.config.effectiveDisplayName}');
+      print(
+          '✅ [${instance.config.effectiveDisplayName}] Hot restart completed');
     } catch (e) {
       stopwatch.stop();
 
-      // Record failed restart
       _recordReloadEvent(
         serviceName: instance.config.name,
         type: 'failed',
@@ -335,7 +421,7 @@ Future<void> runServiceScript() async {
       );
 
       print(
-          '❌ Failed to restart service ${instance.config.effectiveDisplayName}: $e');
+          '❌ [${instance.config.effectiveDisplayName}] Failed to restart: $e');
       rethrow;
     }
   }
@@ -536,6 +622,9 @@ Future<void> runServiceScript() async {
 class ServiceInstance {
   final ServiceConfig config;
   Process process;
+  VmService? vmService;
+  String? isolateId;
+  bool vmConnected = false;
 
   ServiceInstance({
     required this.config,
