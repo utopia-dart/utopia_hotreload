@@ -15,6 +15,7 @@ void main(List<String> args) async {
   final config = _parseArgs(args);
   if (config == null) return; // --help or --version was shown
 
+  final verbose = config.verbose;
   final scriptPath = config.scriptPath;
 
   // Verify the script exists
@@ -23,17 +24,57 @@ void main(List<String> args) async {
     exit(1);
   }
 
+  // Try loading hotreload.yaml for defaults
+  ReloadConfig? fileConfig;
+  try {
+    fileConfig = ReloadConfigFile.load();
+    if (fileConfig != null && verbose) {
+      print('📄 Loaded configuration from hotreload.yaml');
+    }
+  } catch (e) {
+    if (verbose) {
+      print('⚠️  Failed to load hotreload.yaml: $e');
+    }
+  }
+
+  // Apply config file as fallback defaults for unspecified CLI args
+  final watchPaths = config.watchExplicit
+      ? config.watchPaths
+      : (config.watchPaths.isNotEmpty
+          ? config.watchPaths
+          : (fileConfig?.watchPaths ?? ['lib']));
+  final watchExtensions = config.extExplicit
+      ? config.watchExtensions
+      : (config.watchExtensions.isNotEmpty
+          ? config.watchExtensions
+          : (fileConfig?.watchExtensions ?? ['.dart']));
+  final debounceMs = config.debounceExplicit
+      ? config.debounceMs
+      : (fileConfig?.debounceDelay.inMilliseconds ?? config.debounceMs);
+  final resolvedVerbose = config.verboseExplicit
+      ? config.verbose
+      : (fileConfig?.verbose ?? config.verbose);
+
+  final resolvedConfig = _CliConfig(
+    scriptPath: scriptPath,
+    scriptArgs: config.scriptArgs,
+    watchPaths: watchPaths.isEmpty ? ['lib'] : watchPaths,
+    watchExtensions: watchExtensions.isEmpty ? ['.dart'] : watchExtensions,
+    debounceMs: debounceMs,
+    verbose: resolvedVerbose,
+  );
+
   print('🔥 utopia_hotreload v$version');
   print('📄 Script: $scriptPath');
-  print('📁 Watching: ${config.watchPaths}');
-  print('📄 Extensions: ${config.watchExtensions}');
+  print('📁 Watching: ${resolvedConfig.watchPaths}');
+  print('📄 Extensions: ${resolvedConfig.watchExtensions}');
   print('');
   print('💡 Commands:');
   print('  r: Hot reload (falls back to restart if needed)');
   print('  q: Quit');
   print('');
 
-  final runner = _ScriptRunner(config: config);
+  final runner = _ScriptRunner(config: resolvedConfig);
   await runner.start();
 }
 
@@ -44,6 +85,10 @@ class _CliConfig {
   final List<String> watchExtensions;
   final int debounceMs;
   final bool verbose;
+  final bool watchExplicit;
+  final bool extExplicit;
+  final bool debounceExplicit;
+  final bool verboseExplicit;
 
   _CliConfig({
     required this.scriptPath,
@@ -52,6 +97,10 @@ class _CliConfig {
     required this.watchExtensions,
     required this.debounceMs,
     required this.verbose,
+    this.watchExplicit = false,
+    this.extExplicit = false,
+    this.debounceExplicit = false,
+    this.verboseExplicit = false,
   });
 }
 
@@ -60,6 +109,10 @@ _CliConfig? _parseArgs(List<String> args) {
   final watchExtensions = <String>[];
   int debounceMs = 500;
   bool verbose = false;
+  bool watchExplicit = false;
+  bool extExplicit = false;
+  bool debounceExplicit = false;
+  bool verboseExplicit = false;
   String? scriptPath;
   final scriptArgs = <String>[];
 
@@ -93,6 +146,7 @@ _CliConfig? _parseArgs(List<String> args) {
 
     if (arg == '--verbose' || arg == '-v') {
       verbose = true;
+      verboseExplicit = true;
       i++;
       continue;
     }
@@ -103,6 +157,7 @@ _CliConfig? _parseArgs(List<String> args) {
         exit(1);
       }
       watchPaths.add(args[i + 1]);
+      watchExplicit = true;
       i += 2;
       continue;
     }
@@ -118,6 +173,7 @@ _CliConfig? _parseArgs(List<String> args) {
           watchExtensions.add(trimmed.startsWith('.') ? trimmed : '.$trimmed');
         }
       }
+      extExplicit = true;
       i += 2;
       continue;
     }
@@ -133,6 +189,7 @@ _CliConfig? _parseArgs(List<String> args) {
         exit(1);
       }
       debounceMs = parsed;
+      debounceExplicit = true;
       i += 2;
       continue;
     }
@@ -165,10 +222,6 @@ _CliConfig? _parseArgs(List<String> args) {
     exit(1);
   }
 
-  // Apply defaults
-  if (watchPaths.isEmpty) watchPaths.add('lib');
-  if (watchExtensions.isEmpty) watchExtensions.add('.dart');
-
   return _CliConfig(
     scriptPath: scriptPath,
     scriptArgs: scriptArgs,
@@ -176,6 +229,10 @@ _CliConfig? _parseArgs(List<String> args) {
     watchExtensions: watchExtensions,
     debounceMs: debounceMs,
     verbose: verbose,
+    watchExplicit: watchExplicit,
+    extExplicit: extExplicit,
+    debounceExplicit: debounceExplicit,
+    verboseExplicit: verboseExplicit,
   );
 }
 

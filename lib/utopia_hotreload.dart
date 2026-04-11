@@ -52,7 +52,7 @@
 /// ```
 ///
 /// See the [README](https://pub.dev/packages/utopia_hotreload) for more examples.
-library utopia_hotreload;
+library;
 
 // Main public API
 export 'src/developer_tools.dart' show DeveloperTools;

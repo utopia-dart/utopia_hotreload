@@ -1,9 +1,20 @@
 ## [2.0.0]
-- **BREAKING**: Minimum SDK version bumped from 2.17.0 to 3.0.0
-- Improved reliability and performance of hot reload and hot restart
-- Enhanced file watching with better ignore pattern support
-- Improved logging and error handling mechanisms
-- Dashboard feature to monitor reload status and logs
+
+### Breaking Changes
+- **Minimum SDK version bumped to Dart 3.0.0** (was 2.17.0)
+- Removed unused `meta` dependency
+
+### New Features
+- **CLI executable**: Run `dart run utopia_hotreload bin/server.dart` for zero-config hot reload
+- **Lifecycle hooks**: `onBeforeReload`, `onAfterReload`, `onBeforeRestart`, `onAfterRestart`, `onFileChanged`, `onError` callbacks via `LifecycleHooks` class
+- **Configuration file support**: Load settings from `hotreload.yaml` via `ReloadConfigFile`
+- **Fixed multi-service manager**: Services now actually run user code with per-service VM hot reload (was using placeholder scripts)
+
+### Improvements
+- File watcher now uses `DirectoryWatcher` from the `watcher` package for better cross-platform reliability
+- Memory usage detection uses `ProcessInfo.currentRss` instead of shelling out to `tasklist`/`ps`
+- Per-service hot reload via VM service `reloadSources()` with restart fallback
+- Concurrency guard prevents overlapping service restarts
 
 ## [1.0.1]
 

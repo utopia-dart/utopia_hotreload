@@ -108,7 +108,7 @@ class MultiServiceManager {
       return;
     }
 
-    print('� Hot restarting service: ${instance.config.effectiveDisplayName}');
+    print('🔄 Hot restarting service: ${instance.config.effectiveDisplayName}');
     await _restartService(instance);
   }
 
@@ -528,7 +528,7 @@ class MultiServiceManager {
     }
   }
 
-  void _listAndStopServices() {
+  Future<void> _listAndStopServices() async {
     final runningServices = _runningServices.keys.toList();
     if (runningServices.isEmpty) {
       print('ℹ️  No services are currently running');
@@ -543,11 +543,11 @@ class MultiServiceManager {
     // Stop all running services for simplicity
     print('💡 Stopping all running services...');
     for (final serviceName in runningServices) {
-      _stopService(serviceName);
+      await _stopService(serviceName);
     }
   }
 
-  void _listAndStartServices() {
+  Future<void> _listAndStartServices() async {
     final stoppedServices =
         _services.where((s) => !_runningServices.containsKey(s.name)).toList();
     if (stoppedServices.isEmpty) {
@@ -563,7 +563,7 @@ class MultiServiceManager {
     // Start all stopped services for simplicity
     print('💡 Starting all stopped services...');
     for (final service in stoppedServices) {
-      startService(service.name);
+      await startService(service.name);
     }
   }
 

@@ -97,7 +97,7 @@ class ReloadConfigFile {
             : (yaml['dashboard_port'] as int? ?? 9000);
 
     final vmServicePort =
-        yaml['vm_service_port'] ?? yaml['vmServicePort'] as int?;
+        (yaml['vm_service_port'] ?? yaml['vmServicePort']) as int?;
 
     return ReloadConfig(
       mode: mode,
@@ -106,7 +106,7 @@ class ReloadConfigFile {
       ignorePatterns: ignorePatterns,
       debounceDelay: Duration(milliseconds: debounceMs as int),
       verbose: verbose,
-      childVmServicePort: vmServicePort as int?,
+      childVmServicePort: vmServicePort,
       enableDashboard: enableDashboard,
       dashboardPort: dashboardPort,
     );

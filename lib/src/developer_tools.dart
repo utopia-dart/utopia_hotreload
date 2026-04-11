@@ -562,7 +562,7 @@ class _DevelopmentServer {
     });
 
     _keyboardHandler!.registerCommand('exit', () {
-      print('� Shutting down...');
+      print('👋 Shutting down...');
       _shutdown();
     });
 
@@ -830,7 +830,7 @@ class _DevelopmentServer {
 
   String _getRelativePath(String fullPath) {
     final currentDir = Directory.current.path;
-    if (fullPath.startsWith(currentDir)) {
+    if (fullPath.startsWith('$currentDir${Platform.pathSeparator}')) {
       return fullPath.substring(currentDir.length + 1);
     }
     return fullPath;
