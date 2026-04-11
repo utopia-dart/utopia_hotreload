@@ -64,6 +64,18 @@ class ReloadConfig {
   /// Defaults to 9000. Only used when [enableDashboard] is true.
   final int dashboardPort;
 
+  /// Whether to use polling instead of native file system watching.
+  ///
+  /// When null (default), auto-detects environments where native watching
+  /// doesn't work (e.g., WSL2 mounted Windows drives) and uses polling there.
+  /// Set to true to force polling, or false to force native watching.
+  final bool? usePolling;
+
+  /// Delay between filesystem polls when [usePolling] is active.
+  ///
+  /// Defaults to 1 second. Shorter values give faster feedback but use more CPU.
+  final Duration pollingDelay;
+
   /// Creates a new reload configuration with the specified options.
   const ReloadConfig({
     this.mode = ReloadMode.auto,
@@ -89,6 +101,8 @@ class ReloadConfig {
     this.childVmServicePort,
     this.enableDashboard = false,
     this.dashboardPort = 9000,
+    this.usePolling,
+    this.pollingDelay = const Duration(seconds: 1),
   });
 
   /// Creates a configuration with advanced pattern matching using presets.
@@ -102,6 +116,8 @@ class ReloadConfig {
     this.childVmServicePort,
     this.enableDashboard = false,
     this.dashboardPort = 9000,
+    this.usePolling,
+    this.pollingDelay = const Duration(seconds: 1),
   })  : watchExtensions = const ['.dart'],
         ignorePatterns = const [],
         patternPresets = presets,
@@ -121,6 +137,8 @@ class ReloadConfig {
     this.childVmServicePort,
     this.enableDashboard = false,
     this.dashboardPort = 9000,
+    this.usePolling,
+    this.pollingDelay = const Duration(seconds: 1),
   })  : watchExtensions = const ['.dart'],
         ignorePatterns = const [],
         patternPresets = const [],

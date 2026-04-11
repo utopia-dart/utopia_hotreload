@@ -99,6 +99,12 @@ class ReloadConfigFile {
     final vmServicePort =
         (yaml['vm_service_port'] ?? yaml['vmServicePort']) as int?;
 
+    final usePolling =
+        (yaml['use_polling'] ?? yaml['usePolling']) as bool?;
+
+    final pollingDelayMs =
+        (yaml['polling_delay_ms'] ?? yaml['pollingDelayMs']) as int?;
+
     return ReloadConfig(
       mode: mode,
       watchPaths: watchPaths,
@@ -109,6 +115,10 @@ class ReloadConfigFile {
       childVmServicePort: vmServicePort,
       enableDashboard: enableDashboard,
       dashboardPort: dashboardPort,
+      usePolling: usePolling,
+      pollingDelay: pollingDelayMs != null
+          ? Duration(milliseconds: pollingDelayMs)
+          : const Duration(seconds: 1),
     );
   }
 

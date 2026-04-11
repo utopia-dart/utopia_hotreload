@@ -10,15 +10,47 @@ import 'file_pattern_matcher.dart';
 ///
 /// Provides intelligent filtering based on file extensions, ignore patterns,
 /// advanced pattern matching, and debouncing to prevent excessive reload triggers.
+///
+/// Automatically detects environments where native file watching doesn't work
+/// (e.g., WSL2 mounted Windows drives) and falls back to polling.
 class HotReloadFileWatcher {
   final ReloadConfig config;
   final List<StreamSubscription> _watchers = [];
   Timer? _debounceTimer;
   late final FilePatternMatcher _patternMatcher;
 
+  static bool? _usePollingCached;
+
   /// Creates a new file watcher with the given [config].
   HotReloadFileWatcher(this.config) {
     _patternMatcher = config.effectivePatternMatcher;
+  }
+
+  /// Detects if polling mode should be used instead of native file watching.
+  ///
+  /// Returns true on WSL2 with mounted Windows drives, where inotify
+  /// doesn't deliver events for /mnt/ paths.
+  static bool _shouldUsePolling(String watchPath) {
+    if (_usePollingCached != null) return _usePollingCached!;
+
+    if (!Platform.isLinux) {
+      _usePollingCached = false;
+      return false;
+    }
+
+    try {
+      final procVersion = File('/proc/version').readAsStringSync();
+      if (procVersion.toLowerCase().contains('microsoft')) {
+        final absPath = path.normalize(path.absolute(watchPath));
+        if (absPath.startsWith('/mnt/')) {
+          _usePollingCached = true;
+          return true;
+        }
+      }
+    } catch (_) {}
+
+    _usePollingCached = false;
+    return false;
   }
 
   /// Starts watching for file changes and calls [onFileChanged] when relevant files are modified.
@@ -28,12 +60,26 @@ class HotReloadFileWatcher {
   Future<void> start(Function(String filePath) onFileChanged) async {
     print('👁️  Setting up file watchers...');
 
-    for (final path in config.watchPaths) {
-      final dir = Directory(path);
+    for (final watchPathStr in config.watchPaths) {
+      final dir = Directory(watchPathStr);
       if (await dir.exists()) {
-        print('👁️  Watching directory: ${dir.absolute.path}');
+        final absPath = dir.absolute.path;
+        final usePolling = config.usePolling ?? _shouldUsePolling(absPath);
 
-        final directoryWatcher = DirectoryWatcher(dir.absolute.path);
+        if (usePolling) {
+          print('👁️  Watching directory (polling): $absPath');
+        } else {
+          print('👁️  Watching directory: $absPath');
+        }
+
+        final DirectoryWatcher directoryWatcher;
+        if (usePolling) {
+          directoryWatcher = PollingDirectoryWatcher(absPath,
+              pollingDelay: config.pollingDelay);
+        } else {
+          directoryWatcher = DirectoryWatcher(absPath);
+        }
+
         final watcher = directoryWatcher.events.listen((event) {
           final filePath = event.path;
 
@@ -68,7 +114,7 @@ class HotReloadFileWatcher {
 
         _watchers.add(watcher);
       } else {
-        print('⚠️  Watch path does not exist: $path');
+        print('⚠️  Watch path does not exist: $watchPathStr');
       }
     }
 

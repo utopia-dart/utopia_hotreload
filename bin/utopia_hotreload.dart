@@ -78,6 +78,27 @@ void main(List<String> args) async {
   await runner.start();
 }
 
+bool? _usePollingCached;
+
+bool _shouldUsePolling(String watchPath) {
+  if (_usePollingCached != null) return _usePollingCached!;
+  if (!Platform.isLinux) {
+    _usePollingCached = false;
+    return false;
+  }
+  try {
+    final procVersion = File('/proc/version').readAsStringSync();
+    if (procVersion.toLowerCase().contains('microsoft')) {
+      if (p.normalize(p.absolute(watchPath)).startsWith('/mnt/')) {
+        _usePollingCached = true;
+        return true;
+      }
+    }
+  } catch (_) {}
+  _usePollingCached = false;
+  return false;
+}
+
 class _CliConfig {
   final String scriptPath;
   final List<String> scriptArgs;
@@ -292,8 +313,19 @@ class _ScriptRunner {
         continue;
       }
 
-      print('👁️  Watching: ${dir.absolute.path}');
-      final watcher = DirectoryWatcher(dir.absolute.path);
+      final absPath = dir.absolute.path;
+      final usePolling = _shouldUsePolling(absPath);
+      if (usePolling) {
+        print('👁️  Watching (polling): $absPath');
+      } else {
+        print('👁️  Watching: $absPath');
+      }
+      final DirectoryWatcher watcher;
+      if (usePolling) {
+        watcher = PollingDirectoryWatcher(absPath);
+      } else {
+        watcher = DirectoryWatcher(absPath);
+      }
       final sub = watcher.events.listen((event) {
         final filePath = event.path;
         final ext = p.extension(filePath);

@@ -155,6 +155,7 @@ class DeveloperTools {
     bool enableDashboard = false,
     int dashboardPort = 9000,
     LifecycleHooks? hooks,
+    bool? usePolling,
   }) async {
     if (Platform.environment['UTOPIA_DEV_MODE'] == 'true') {
       await script();
@@ -176,6 +177,7 @@ class DeveloperTools {
         childVmServicePort: childVmServicePort,
         enableDashboard: enableDashboard,
         dashboardPort: dashboardPort,
+        usePolling: usePolling,
       );
     } else if (patternPresets.isNotEmpty || customPatterns.isNotEmpty) {
       config = ReloadConfig.withPatterns(
@@ -188,6 +190,7 @@ class DeveloperTools {
         childVmServicePort: childVmServicePort,
         enableDashboard: enableDashboard,
         dashboardPort: dashboardPort,
+        usePolling: usePolling,
       );
     } else {
       config = ReloadConfig(
@@ -200,6 +203,7 @@ class DeveloperTools {
         childVmServicePort: childVmServicePort,
         enableDashboard: enableDashboard,
         dashboardPort: dashboardPort,
+        usePolling: usePolling,
       );
     }
 
