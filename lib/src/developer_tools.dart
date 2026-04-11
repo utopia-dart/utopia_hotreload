@@ -308,6 +308,18 @@ class DeveloperTools {
       throw ArgumentError('At least one service must be provided');
     }
 
+    final targetServiceName = Platform.environment['UTOPIA_SERVICE_NAME'];
+    if (targetServiceName != null) {
+      final service = services.firstWhere(
+        (s) => s.name == targetServiceName,
+        orElse: () => throw ArgumentError(
+          'Service not found: $targetServiceName',
+        ),
+      );
+      await service.script();
+      return;
+    }
+
     await _ensureVmServiceEnabled();
 
     // Create global configuration based on what's provided
