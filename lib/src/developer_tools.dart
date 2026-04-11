@@ -10,6 +10,7 @@ import 'multi_service_manager.dart';
 import 'keyboard_input_handler.dart';
 import 'file_pattern_matcher.dart';
 import 'dashboard/dashboard_service.dart';
+import 'lifecycle_hooks.dart';
 import 'package:vm_service/vm_service.dart';
 import 'package:vm_service/vm_service_io.dart';
 
@@ -153,6 +154,7 @@ class DeveloperTools {
     int? childVmServicePort,
     bool enableDashboard = false,
     int dashboardPort = 9000,
+    LifecycleHooks? hooks,
   }) async {
     if (Platform.environment['UTOPIA_DEV_MODE'] == 'true') {
       await script();
@@ -207,7 +209,7 @@ class DeveloperTools {
     print('  q: Quit');
     print('');
 
-    final devServer = _DevelopmentServer(config: config);
+    final devServer = _DevelopmentServer(config: config, hooks: hooks);
     await devServer.start();
   }
 
@@ -303,12 +305,18 @@ class DeveloperTools {
     bool enableDashboard = true,
     String dashboardHost = 'localhost',
     int dashboardPort = 9000,
+    // Multi-service lifecycle hooks will be supported in a future version.
+    LifecycleHooks? globalHooks,
   }) async {
     if (services.isEmpty) {
       throw ArgumentError('At least one service must be provided');
     }
 
     await _ensureVmServiceEnabled();
+
+    if (globalHooks != null) {
+      print('⚠️  globalHooks is not yet supported for startMultiple() and will be ignored');
+    }
 
     // Create global configuration based on what's provided
     late final ReloadConfig globalConfig;
@@ -418,6 +426,7 @@ class DeveloperTools {
 /// Development server that manages the user script in a separate process.
 class _DevelopmentServer {
   final ReloadConfig config;
+  final LifecycleHooks? hooks;
   Process? _userProcess;
   late final HotReloadFileWatcher _fileWatcher;
   StreamSubscription? _stdinSubscription;
@@ -434,7 +443,7 @@ class _DevelopmentServer {
   // Dashboard support
   DashboardService? _dashboard;
 
-  _DevelopmentServer({required this.config});
+  _DevelopmentServer({required this.config, this.hooks});
 
   Future<void> start() async {
     print('🚀 Starting application with auto hot reload...');
@@ -475,9 +484,13 @@ class _DevelopmentServer {
       }
     }
 
-    await _fileWatcher.start((filePath) {
+    await _fileWatcher.start((filePath) async {
       final relativePath = _getRelativePath(filePath);
-      print('📝 File changed: $relativePath');
+      try {
+        await hooks?.onFileChanged?.call(relativePath);
+      } catch (e) {
+        print('⚠️  onFileChanged hook error: $e');
+      }
       _performAutoReload();
     });
 
@@ -696,6 +709,16 @@ class _DevelopmentServer {
         return false;
       }
       print('🔥 Performing hot reload...');
+      bool shouldReload = true;
+      try {
+        shouldReload = await hooks?.onBeforeReload?.call() ?? true;
+      } catch (e) {
+        print('⚠️  onBeforeReload hook error: $e');
+      }
+      if (!shouldReload) {
+        print('ℹ️  Reload cancelled by onBeforeReload hook');
+        return true;
+      }
       final stopwatch = Stopwatch()..start();
       final report = await _childVmService!.reloadSources(_childIsolateId!);
       stopwatch.stop();
@@ -707,6 +730,11 @@ class _DevelopmentServer {
           type: 'hot_reload',
           duration: Duration(milliseconds: stopwatch.elapsedMilliseconds),
         );
+        try {
+          await hooks?.onAfterReload?.call();
+        } catch (e) {
+          print('⚠️  onAfterReload hook error: $e');
+        }
         return true;
       }
 
@@ -720,15 +748,26 @@ class _DevelopmentServer {
         duration: Duration(milliseconds: stopwatch.elapsedMilliseconds),
         error: errorMessage,
       );
+      try {
+        await hooks?.onError?.call(errorMessage);
+      } catch (e) {
+        print('⚠️  onError hook error: $e');
+      }
       return false;
     } catch (e) {
-      print('❌ Hot reload failed: $e');
+      final errorMsg = 'Hot reload failed: $e';
+      print('❌ $errorMsg');
       _dashboard?.recordReloadEvent(
         serviceName: 'main',
         type: 'failed',
         duration: Duration.zero,
-        error: 'Hot reload failed: $e',
+        error: errorMsg,
       );
+      try {
+        await hooks?.onError?.call(errorMsg);
+      } catch (hookError) {
+        print('⚠️  onError hook error: $hookError');
+      }
       return false;
     }
   }
@@ -737,10 +776,20 @@ class _DevelopmentServer {
     try {
       print('🔄 Performing hot restart...');
       _isRestarting = true;
+      try {
+        await hooks?.onBeforeRestart?.call();
+      } catch (e) {
+        print('⚠️  onBeforeRestart hook error: $e');
+      }
       final stopwatch = Stopwatch()..start();
       await _killUserProcess();
       await Future.delayed(Duration(milliseconds: 150));
       await _startUserScript();
+      try {
+        await hooks?.onAfterRestart?.call();
+      } catch (e) {
+        print('⚠️  onAfterRestart hook error: $e');
+      }
       stopwatch.stop();
       print('✅ Hot restart completed');
       _dashboard?.recordReloadEvent(
@@ -749,12 +798,18 @@ class _DevelopmentServer {
         duration: Duration(milliseconds: stopwatch.elapsedMilliseconds),
       );
     } catch (e) {
-      print('❌ Hot restart failed: $e');
+      final errorMsg = 'Hot restart failed: $e';
+      print('❌ $errorMsg');
+      try {
+        await hooks?.onError?.call(errorMsg);
+      } catch (hookError) {
+        print('⚠️  onError hook error: $hookError');
+      }
       _dashboard?.recordReloadEvent(
         serviceName: 'main',
         type: 'failed',
         duration: Duration.zero,
-        error: 'Hot restart failed: $e',
+        error: errorMsg,
       );
     } finally {
       _isRestarting = false;
