@@ -3,7 +3,7 @@
 Advanced hot reload and hot restart functionality for Dart applications with true VM-based hot reload capabilities, similar to Flutter's development experience.
 
 [![Pub Version](https://img.shields.io/pub/v/utopia_hotreload)](https://pub.dev/packages/utopia_hotreload)
-[![Dart SDK Version](https://img.shields.io/badge/dart-%3E%3D2.17.0-blue)](https://dart.dev)
+[![Dart SDK Version](https://img.shields.io/badge/dart-%3E%3D3.0.0-blue)](https://dart.dev)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![GitHub Actions](https://github.com/utopia-dart/utopia_hotreload/workflows/CI/badge.svg)](https://github.com/utopia-dart/utopia_hotreload/actions)
 [![Pub Points](https://img.shields.io/pub/points/utopia_hotreload)](https://pub.dev/packages/utopia_hotreload/score)
@@ -471,7 +471,7 @@ void main() async {
 
 ## Requirements
 
-- Dart SDK 2.17.0 or higher
+- Dart SDK 3.0.0 or higher
 - For hot reload: Dart VM service support (automatically enabled)
 
 ## Troubleshooting

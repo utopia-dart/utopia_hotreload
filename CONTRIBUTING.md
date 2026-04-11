@@ -6,7 +6,7 @@ Thank you for your interest in contributing to Utopia Hot Reload! This document 
 
 ### Prerequisites
 
-- Dart SDK 2.17.0 or higher
+- Dart SDK 3.0.0 or higher
 - Git
 - A GitHub account
 

@@ -1,4 +1,5 @@
 ## [2.0.0]
+- **BREAKING**: Minimum SDK version bumped from 2.17.0 to 3.0.0
 - Improved reliability and performance of hot reload and hot restart
 - Enhanced file watching with better ignore pattern support
 - Improved logging and error handling mechanisms
