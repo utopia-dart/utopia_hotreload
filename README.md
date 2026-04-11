@@ -53,6 +53,35 @@ void main() async {
 }
 ```
 
+## CLI Usage
+
+Run any Dart script with hot reload — no code changes needed:
+
+```bash
+# Basic usage
+dart run utopia_hotreload bin/server.dart
+
+# Watch multiple directories
+dart run utopia_hotreload -w lib -w bin bin/server.dart
+
+# Custom extensions and verbose mode
+dart run utopia_hotreload -e .dart,.yaml --verbose bin/server.dart
+
+# Pass arguments to your script
+dart run utopia_hotreload bin/server.dart -- --port 8080
+```
+
+### CLI Options
+
+| Option | Short | Default | Description |
+|--------|-------|---------|-------------|
+| `--watch` | `-w` | `lib` | Directories to watch (repeatable) |
+| `--ext` | `-e` | `.dart` | Extensions to watch (comma-separated) |
+| `--debounce` | | `500` | Debounce delay in milliseconds |
+| `--verbose` | `-v` | `false` | Enable verbose logging |
+| `--help` | `-h` | | Show help message |
+| `--version` | | | Show version |
+
 ## Usage
 
 ### Basic Usage

@@ -10,6 +10,9 @@ documentation: https://github.com/utopia-dart/utopia_hotreload#readme
 funding:
   - https://github.com/sponsors/utopia-dart
 
+executables:
+  utopia_hotreload: utopia_hotreload
+
 environment:
   sdk: '>=3.0.0 <4.0.0'
 
