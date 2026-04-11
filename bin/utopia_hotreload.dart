@@ -29,8 +29,7 @@ void main(List<String> args) async {
   print('📄 Extensions: ${config.watchExtensions}');
   print('');
   print('💡 Commands:');
-  print('  r: Hot reload (preserves state)');
-  print('  R: Hot restart (full restart)');
+  print('  r: Hot reload (falls back to restart if needed)');
   print('  q: Quit');
   print('');
 
@@ -128,7 +127,12 @@ _CliConfig? _parseArgs(List<String> args) {
         stderr.writeln('Error: --debounce requires a milliseconds argument');
         exit(1);
       }
-      debounceMs = int.tryParse(args[i + 1]) ?? 500;
+      final parsed = int.tryParse(args[i + 1]);
+      if (parsed == null || parsed <= 0) {
+        stderr.writeln('Error: --debounce must be a positive integer (got: ${args[i + 1]})');
+        exit(1);
+      }
+      debounceMs = parsed;
       i += 2;
       continue;
     }
@@ -140,15 +144,18 @@ _CliConfig? _parseArgs(List<String> args) {
     }
 
     // First non-option argument is the script path
-    if (scriptPath == null) {
-      scriptPath = arg;
-      i++;
-      continue;
-    }
-
-    // Subsequent non-option arguments after script are script args
-    scriptArgs.add(arg);
+    scriptPath = arg;
     i++;
+    // Everything after the script path is passed to the script
+    while (i < args.length) {
+      if (args[i] == '--') {
+        i++;
+        continue;
+      }
+      scriptArgs.add(args[i]);
+      i++;
+    }
+    break;
   }
 
   if (scriptPath == null) {
@@ -190,7 +197,7 @@ Examples:
   dart run utopia_hotreload bin/server.dart
   dart run utopia_hotreload -w lib -w bin bin/server.dart
   dart run utopia_hotreload -e .dart,.yaml --verbose bin/server.dart
-  dart run utopia_hotreload bin/server.dart -- --port 8080''');
+  dart run utopia_hotreload bin/server.dart --port 8080''');
 }
 
 class _ScriptRunner {
@@ -266,13 +273,8 @@ class _ScriptRunner {
     );
 
     _keyboardHandler!.registerCommand('r', () {
-      print('🔥 Manual hot reload triggered...');
-      _performHotReload();
-    });
-
-    _keyboardHandler!.registerCommand('R', () {
-      print('🔄 Manual hot restart triggered...');
-      _performHotRestart();
+      print('🔥 Reload triggered...');
+      _performAutoReload();
     });
 
     _keyboardHandler!.registerCommand('q', () {
@@ -282,7 +284,7 @@ class _ScriptRunner {
 
     await _keyboardHandler!.start(
       helpText:
-          '🎮 Press: r (reload), R (restart), q (quit), Ctrl+C (force quit)',
+          '🎮 Press: r (hot reload with restart fallback), q (quit), Ctrl+C (force quit)',
     );
   }
 
