@@ -1,3 +1,16 @@
+## [2.0.1]
+
+### Bug Fixes
+- **WSL2 file watching**: Auto-detect WSL2 mounted Windows drives (`/mnt/`) and use `PollingDirectoryWatcher` since `inotify` doesn't deliver events on those paths
+- **Keyboard commands**: `r` (hot reload) and `R` (hot restart) now work correctly — previously both triggered hot restart due to case-insensitive command registration
+- Fixed operator precedence bug in YAML config parser for `vm_service_port`
+- Fixed unawaited futures in multi-service manager
+- Fixed path prefix matching that could produce false positives on overlapping directory names
+
+### New Configuration Options
+- `usePolling` (`use_polling` in YAML): Force polling-based file watching, or set to `null` for auto-detection
+- `pollingDelay` (`polling_delay_ms` in YAML): Configure polling interval (default: 1 second)
+
 ## [2.0.0]
 
 ### Breaking Changes
@@ -9,6 +22,7 @@
 - **Lifecycle hooks**: `onBeforeReload`, `onAfterReload`, `onBeforeRestart`, `onAfterRestart`, `onFileChanged`, `onError` callbacks via `LifecycleHooks` class
 - **Configuration file support**: Load settings from `hotreload.yaml` via `ReloadConfigFile`
 - **Fixed multi-service manager**: Services now actually run user code with per-service VM hot reload (was using placeholder scripts)
+- **Advanced file pattern matching**: Glob patterns, regex, and predefined presets (`dart-project`, `web-project`, `flutter-project`)
 
 ### Improvements
 - File watcher now uses `DirectoryWatcher` from the `watcher` package for better cross-platform reliability
