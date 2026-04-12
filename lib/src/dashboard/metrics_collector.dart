@@ -101,37 +101,7 @@ class MetricsCollector {
   }
 
   Future<int> _getMemoryUsage() async {
-    try {
-      // Get current process memory usage
-      final processInfo =
-          await Process.run('tasklist', ['/fi', 'PID eq $pid', '/fo', 'csv']);
-      if (processInfo.exitCode == 0) {
-        final lines = processInfo.stdout.toString().split('\n');
-        if (lines.length > 1) {
-          final memoryColumn = lines[1].split(',');
-          if (memoryColumn.length > 4) {
-            final memoryStr = memoryColumn[4]
-                .replaceAll('"', '')
-                .replaceAll(',', '')
-                .replaceAll(' K', '');
-            return int.tryParse(memoryStr) ?? 0;
-          }
-        }
-      }
-    } catch (e) {
-      // Fallback for non-Windows or if tasklist fails
-      try {
-        final result =
-            await Process.run('ps', ['-o', 'rss=', '-p', pid.toString()]);
-        if (result.exitCode == 0) {
-          final memoryKb = int.tryParse(result.stdout.toString().trim()) ?? 0;
-          return memoryKb;
-        }
-      } catch (e2) {
-        // If both methods fail, return 0
-      }
-    }
-    return 0;
+    return ProcessInfo.currentRss;
   }
 
   int _getActiveFileWatches() {

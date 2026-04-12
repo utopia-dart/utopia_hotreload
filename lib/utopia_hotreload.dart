@@ -52,13 +52,15 @@
 /// ```
 ///
 /// See the [README](https://pub.dev/packages/utopia_hotreload) for more examples.
-library utopia_hotreload;
+library;
 
 // Main public API
 export 'src/developer_tools.dart' show DeveloperTools;
+export 'src/lifecycle_hooks.dart' show LifecycleHooks;
 
 // Configuration classes that users might need
-export 'src/reload_config.dart' show ReloadMode;
+export 'src/reload_config.dart' show ReloadMode, ReloadConfig;
+export 'src/reload_config_file.dart' show ReloadConfigFile;
 
 // Multi-service support
 export 'src/service_config.dart' show ServiceConfig;

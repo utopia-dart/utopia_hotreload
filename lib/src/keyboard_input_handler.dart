@@ -47,7 +47,7 @@ class KeyboardInputHandler {
 
   /// Registers a command handler for the given key/command.
   void registerCommand(String command, void Function() handler) {
-    _commandHandlers[command.toLowerCase()] = handler;
+    _commandHandlers[command] = handler;
   }
 
   /// Starts listening for keyboard input.
@@ -156,7 +156,7 @@ class KeyboardInputHandler {
           return;
         }
 
-        final char = String.fromCharCode(byte).toLowerCase();
+        final char = String.fromCharCode(byte);
         final handler = _commandHandlers[char];
         if (handler != null) {
           print(''); // New line for clean output
@@ -175,7 +175,7 @@ class KeyboardInputHandler {
             .transform(utf8.decoder)
             .transform(const LineSplitter())
             .listen((line) {
-          final command = line.trim().toLowerCase();
+          final command = line.trim();
           if (command.isEmpty) return;
 
           // Create a copy of the list to avoid concurrent modification
@@ -185,15 +185,17 @@ class KeyboardInputHandler {
           for (final handler in handlersCopy) {
             if (!handler._isActive) continue;
 
+            // Try exact match first
             final handlerCommand = handler._commandHandlers[command];
             if (handlerCommand != null) {
               handlerCommand();
             } else {
-              // Try single character commands for compatibility
-              if (command.length == 1) {
-                final charHandler = handler._commandHandlers[command];
-                if (charHandler != null) {
-                  charHandler();
+              // Try case-insensitive match for multi-char commands (e.g., "quit", "exit")
+              final lowerCommand = command.toLowerCase();
+              if (lowerCommand.length > 1) {
+                final lowerHandler = handler._commandHandlers[lowerCommand];
+                if (lowerHandler != null) {
+                  lowerHandler();
                 }
               }
             }

@@ -6,7 +6,7 @@ Thank you for your interest in contributing to Utopia Hot Reload! This document 
 
 ### Prerequisites
 
-- Dart SDK 2.17.0 or higher
+- Dart SDK 3.0.0 or higher
 - Git
 - A GitHub account
 
@@ -30,18 +30,24 @@ Thank you for your interest in contributing to Utopia Hot Reload! This document 
 ## 🏗️ Project Structure
 
 ```
-utopia_hotreload/
-├── lib/
-│   ├── utopia_hotreload.dart       # Main library exports
-│   └── src/                        # Implementation
-│       ├── auto_reload_manager.dart # VM service integration
-│       ├── developer_tools.dart    # Public API
-│       ├── file_watcher.dart      # File system monitoring
-│       └── reload_config.dart       # Configuration types
-├── example/
-│   └── example.dart               # Usage examples
-├── CHANGELOG.md                   # Version history
-└── README.md                      # Documentation
+lib/
+├── utopia_hotreload.dart          # Main library entry point
+└── src/
+    ├── developer_tools.dart       # Core DeveloperTools class
+    ├── file_watcher.dart          # File system watching
+    ├── file_pattern_matcher.dart  # Advanced pattern matching
+    ├── keyboard_input_handler.dart # Keyboard input handling
+    ├── lifecycle_hooks.dart       # Lifecycle hook callbacks
+    ├── multi_service_manager.dart # Multi-service coordination
+    ├── reload_config.dart         # Reload configuration
+    ├── reload_config_file.dart    # YAML config file support
+    ├── service_config.dart        # Service configuration
+    └── dashboard/
+        ├── dashboard_service.dart # Web dashboard server
+        ├── metrics_collector.dart # Performance metrics
+        └── reload_history.dart    # Reload event tracking
+bin/
+└── utopia_hotreload.dart          # CLI executable
 ```
 
 ## 💡 Contributing Guidelines

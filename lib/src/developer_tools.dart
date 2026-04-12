@@ -4,12 +4,14 @@ import 'dart:io';
 import 'dart:developer' as developer;
 
 import 'reload_config.dart';
+import 'reload_config_file.dart';
 import 'file_watcher.dart';
 import 'service_config.dart';
 import 'multi_service_manager.dart';
 import 'keyboard_input_handler.dart';
 import 'file_pattern_matcher.dart';
 import 'dashboard/dashboard_service.dart';
+import 'lifecycle_hooks.dart';
 import 'package:vm_service/vm_service.dart';
 import 'package:vm_service/vm_service_io.dart';
 
@@ -49,110 +51,53 @@ class DeveloperTools {
 
   /// Starts a development server with hot reload capabilities.
   ///
-  /// Sets up file watching, process management, and interactive commands
-  /// to provide a seamless development experience.
+  /// ## Configuration Precedence
+  ///
+  /// Configuration is resolved in this order (highest priority first):
+  /// 1. **Parameters passed to this method** (e.g., `watchPaths: ['lib', 'bin']`)
+  /// 2. **`hotreload.yaml`** file in the project root (auto-loaded)
+  /// 3. **Built-in defaults** (watch `lib/`, `.dart` files, 500ms debounce)
+  ///
+  /// This means you can use `hotreload.yaml` for project-wide defaults and
+  /// override specific values in code when needed. If no config file exists,
+  /// built-in defaults are used.
   ///
   /// ## Parameters
   ///
-  /// - **[script]**: The main function of your application. Executed in a
-  ///   separate process and can be hot reloaded or restarted.
-  ///
-  /// - **[watchPaths]**: List of directory paths to monitor for changes.
-  ///   Defaults to `['lib']`. Use relative paths from your project root.
-  ///
-  /// - **[watchExtensions]**: File extensions to watch for changes.
-  ///   Defaults to `['.dart']`. Include the dot (e.g., '.dart', '.yaml').
-  ///
-  /// - **[ignorePatterns]**: Patterns to ignore when watching files.
-  ///   Useful for excluding build directories, version control, etc.
-  ///
-  /// - **[debounceDelay]**: Time to wait after a file change before triggering
-  ///   a reload. Prevents excessive reloads during rapid saves. Defaults to 500ms.
-  ///
-  /// - **[verbose]**: Enable detailed logging for debugging. Shows file events,
-  ///   VM service details, and diagnostic information. Defaults to false.
-  ///
+  /// - **[script]**: The main function of your application.
+  /// - **[watchPaths]**: Directories to monitor. Defaults to YAML or `['lib']`.
+  /// - **[watchExtensions]**: File extensions to watch. Defaults to YAML or `['.dart']`.
+  /// - **[ignorePatterns]**: Patterns to ignore. Defaults to YAML or common patterns.
+  /// - **[debounceDelay]**: Delay before triggering reload. Defaults to YAML or 500ms.
+  /// - **[verbose]**: Enable detailed logging. Defaults to YAML or `false`.
   /// - **[childVmServicePort]**: Specific port for the child VM service.
-  ///   If null, uses an available port automatically.
+  /// - **[enableDashboard]**: Enable the web dashboard. Defaults to YAML or `false`.
+  /// - **[dashboardPort]**: Dashboard port. Defaults to YAML or `9000`.
+  /// - **[usePolling]**: Force polling file watcher (useful for WSL2/network drives).
+  /// - **[configFile]**: Custom path to YAML config file. Defaults to `hotreload.yaml`.
+  /// - **[hooks]**: Lifecycle callbacks for reload/restart events.
   ///
   /// ## Interactive Commands
   ///
-  /// While running, use these commands:
-  ///
-  /// - **`r`** + Enter: Hot reload (preserves application state)
-  /// - **`R`** + Enter: Hot restart (full application restart)
-  /// - **`q`** + Enter: Quit the development server
-  /// - **Ctrl+C**: Force quit the development server
-  ///
-  /// ## Examples
-  ///
-  /// ### Basic Usage
-  /// ```dart
-  /// await DeveloperTools.start(
-  ///   script: () async {
-  ///     print('Hello, hot reload!');
-  ///   },
-  /// );
-  /// ```
-  ///
-  /// ### HTTP Server Example
-  /// ```dart
-  /// await DeveloperTools.start(
-  ///   script: () async {
-  ///     final server = await HttpServer.bind('localhost', 8080);
-  ///     await for (final request in server) {
-  ///       request.response
-  ///         ..write('Hello from hot reload! ${DateTime.now()}')
-  ///         ..close();
-  ///     }
-  ///   },
-  ///   watchPaths: ['lib', 'web'],
-  ///   verbose: true,
-  /// );
-  /// ```
-  ///
-  /// ### Custom Configuration
-  /// ```dart
-  /// await DeveloperTools.start(
-  ///   script: runMyComplexApp,
-  ///   watchPaths: ['lib', 'bin', 'config'],
-  ///   watchExtensions: ['.dart', '.yaml', '.json'],
-  ///   ignorePatterns: ['.git/', 'build/', 'temp/'],
-  ///   debounceDelay: Duration(milliseconds: 200),
-  ///   verbose: false,
-  /// );
-  /// ```
-  ///
-  /// ### Advanced Pattern Matching
-  /// ```dart
-  /// await DeveloperTools.start(
-  ///   script: runMyApp,
-  ///   watchPaths: ['lib', 'web'],
-  ///   patternPresets: ['dart-project', 'web-project'],
-  ///   customPatterns: [
-  ///     FilePattern.include('**/*.env'),
-  ///     FilePattern.exclude('lib/generated/**'),
-  ///   ],
-  /// );
-  /// ```
+  /// - **`r`**: Hot reload (preserves application state)
+  /// - **`R`**: Hot restart (full application restart)
+  /// - **`q`**: Quit the development server
   static Future<void> start({
     required Future<void> Function() script,
-    List<String> watchPaths = const ['lib'],
-    List<String> watchExtensions = const ['.dart'],
-    List<String> ignorePatterns = const [
-      '.git/',
-      '.dart_tool/',
-      'build/',
-      'pubspec.lock',
-    ],
+    List<String>? watchPaths,
+    List<String>? watchExtensions,
+    List<String>? ignorePatterns,
     List<String> patternPresets = const [],
     List<FilePattern> customPatterns = const [],
     FilePatternMatcher? patternMatcher,
-    Duration debounceDelay = const Duration(milliseconds: 500),
-    bool verbose = false,
+    Duration? debounceDelay,
+    bool? verbose,
     int? childVmServicePort,
-    bool enableDashboard = false,
-    int dashboardPort = 9000,
+    bool? enableDashboard,
+    int? dashboardPort,
+    LifecycleHooks? hooks,
+    bool? usePolling,
+    String? configFile,
   }) async {
     if (Platform.environment['UTOPIA_DEV_MODE'] == 'true') {
       await script();
@@ -161,43 +106,59 @@ class DeveloperTools {
 
     await _ensureVmServiceEnabled();
 
-    // Create configuration based on what's provided
+    // Auto-load hotreload.yaml (or custom config file) as base config.
+    // Programmatic parameters override file values.
+    final fileConfig = ReloadConfigFile.load(configFile);
+
+    final effectiveWatchPaths = watchPaths ?? fileConfig?.watchPaths ?? const ['lib'];
+    final effectiveWatchExtensions = watchExtensions ?? fileConfig?.watchExtensions ?? const ['.dart'];
+    final effectiveIgnorePatterns = ignorePatterns ?? fileConfig?.ignorePatterns ?? const ['.git/', '.dart_tool/', 'build/', 'pubspec.lock'];
+    final effectiveDebounce = debounceDelay ?? fileConfig?.debounceDelay ?? const Duration(milliseconds: 500);
+    final effectiveVerbose = verbose ?? fileConfig?.verbose ?? false;
+    final effectiveVmPort = childVmServicePort ?? fileConfig?.childVmServicePort;
+    final effectiveDashboard = enableDashboard ?? fileConfig?.enableDashboard ?? false;
+    final effectiveDashboardPort = dashboardPort ?? fileConfig?.dashboardPort ?? 9000;
+    final effectivePolling = usePolling ?? fileConfig?.usePolling;
+
     late final ReloadConfig config;
 
     if (patternMatcher != null) {
       config = ReloadConfig.withMatcher(
         mode: ReloadMode.auto,
-        watchPaths: watchPaths,
+        watchPaths: effectiveWatchPaths,
         patternMatcher: patternMatcher,
-        debounceDelay: debounceDelay,
-        verbose: verbose,
-        childVmServicePort: childVmServicePort,
-        enableDashboard: enableDashboard,
-        dashboardPort: dashboardPort,
+        debounceDelay: effectiveDebounce,
+        verbose: effectiveVerbose,
+        childVmServicePort: effectiveVmPort,
+        enableDashboard: effectiveDashboard,
+        dashboardPort: effectiveDashboardPort,
+        usePolling: effectivePolling,
       );
     } else if (patternPresets.isNotEmpty || customPatterns.isNotEmpty) {
       config = ReloadConfig.withPatterns(
         mode: ReloadMode.auto,
-        watchPaths: watchPaths,
+        watchPaths: effectiveWatchPaths,
         presets: patternPresets,
         patterns: customPatterns,
-        debounceDelay: debounceDelay,
-        verbose: verbose,
-        childVmServicePort: childVmServicePort,
-        enableDashboard: enableDashboard,
-        dashboardPort: dashboardPort,
+        debounceDelay: effectiveDebounce,
+        verbose: effectiveVerbose,
+        childVmServicePort: effectiveVmPort,
+        enableDashboard: effectiveDashboard,
+        dashboardPort: effectiveDashboardPort,
+        usePolling: effectivePolling,
       );
     } else {
       config = ReloadConfig(
-        mode: ReloadMode.auto,
-        watchPaths: watchPaths,
-        watchExtensions: watchExtensions,
-        ignorePatterns: ignorePatterns,
-        debounceDelay: debounceDelay,
-        verbose: verbose,
-        childVmServicePort: childVmServicePort,
-        enableDashboard: enableDashboard,
-        dashboardPort: dashboardPort,
+        mode: fileConfig?.mode ?? ReloadMode.auto,
+        watchPaths: effectiveWatchPaths,
+        watchExtensions: effectiveWatchExtensions,
+        ignorePatterns: effectiveIgnorePatterns,
+        debounceDelay: effectiveDebounce,
+        verbose: effectiveVerbose,
+        childVmServicePort: effectiveVmPort,
+        enableDashboard: effectiveDashboard,
+        dashboardPort: effectiveDashboardPort,
+        usePolling: effectivePolling,
       );
     }
 
@@ -207,7 +168,7 @@ class DeveloperTools {
     print('  q: Quit');
     print('');
 
-    final devServer = _DevelopmentServer(config: config);
+    final devServer = _DevelopmentServer(config: config, hooks: hooks);
     await devServer.start();
   }
 
@@ -303,12 +264,30 @@ class DeveloperTools {
     bool enableDashboard = true,
     String dashboardHost = 'localhost',
     int dashboardPort = 9000,
+    // Multi-service lifecycle hooks will be supported in a future version.
+    LifecycleHooks? globalHooks,
   }) async {
     if (services.isEmpty) {
       throw ArgumentError('At least one service must be provided');
     }
 
+    final targetServiceName = Platform.environment['UTOPIA_SERVICE_NAME'];
+    if (targetServiceName != null) {
+      final service = services.firstWhere(
+        (s) => s.name == targetServiceName,
+        orElse: () => throw ArgumentError(
+          'Service not found: $targetServiceName',
+        ),
+      );
+      await service.script();
+      return;
+    }
+
     await _ensureVmServiceEnabled();
+
+    if (globalHooks != null) {
+      print('⚠️  globalHooks is not yet supported for startMultiple() and will be ignored');
+    }
 
     // Create global configuration based on what's provided
     late final ReloadConfig globalConfig;
@@ -418,6 +397,7 @@ class DeveloperTools {
 /// Development server that manages the user script in a separate process.
 class _DevelopmentServer {
   final ReloadConfig config;
+  final LifecycleHooks? hooks;
   Process? _userProcess;
   late final HotReloadFileWatcher _fileWatcher;
   StreamSubscription? _stdinSubscription;
@@ -434,7 +414,7 @@ class _DevelopmentServer {
   // Dashboard support
   DashboardService? _dashboard;
 
-  _DevelopmentServer({required this.config});
+  _DevelopmentServer({required this.config, this.hooks});
 
   Future<void> start() async {
     print('🚀 Starting application with auto hot reload...');
@@ -475,9 +455,13 @@ class _DevelopmentServer {
       }
     }
 
-    await _fileWatcher.start((filePath) {
+    await _fileWatcher.start((filePath) async {
       final relativePath = _getRelativePath(filePath);
-      print('📝 File changed: $relativePath');
+      try {
+        await hooks?.onFileChanged?.call(relativePath);
+      } catch (e) {
+        print('⚠️  onFileChanged hook error: $e');
+      }
       _performAutoReload();
     });
 
@@ -537,7 +521,7 @@ class _DevelopmentServer {
     });
 
     _keyboardHandler!.registerCommand('exit', () {
-      print('� Shutting down...');
+      print('👋 Shutting down...');
       _shutdown();
     });
 
@@ -696,6 +680,16 @@ class _DevelopmentServer {
         return false;
       }
       print('🔥 Performing hot reload...');
+      bool shouldReload = true;
+      try {
+        shouldReload = await hooks?.onBeforeReload?.call() ?? true;
+      } catch (e) {
+        print('⚠️  onBeforeReload hook error: $e');
+      }
+      if (!shouldReload) {
+        print('ℹ️  Reload cancelled by onBeforeReload hook');
+        return true;
+      }
       final stopwatch = Stopwatch()..start();
       final report = await _childVmService!.reloadSources(_childIsolateId!);
       stopwatch.stop();
@@ -707,6 +701,11 @@ class _DevelopmentServer {
           type: 'hot_reload',
           duration: Duration(milliseconds: stopwatch.elapsedMilliseconds),
         );
+        try {
+          await hooks?.onAfterReload?.call();
+        } catch (e) {
+          print('⚠️  onAfterReload hook error: $e');
+        }
         return true;
       }
 
@@ -720,15 +719,26 @@ class _DevelopmentServer {
         duration: Duration(milliseconds: stopwatch.elapsedMilliseconds),
         error: errorMessage,
       );
+      try {
+        await hooks?.onError?.call(errorMessage);
+      } catch (e) {
+        print('⚠️  onError hook error: $e');
+      }
       return false;
     } catch (e) {
-      print('❌ Hot reload failed: $e');
+      final errorMsg = 'Hot reload failed: $e';
+      print('❌ $errorMsg');
       _dashboard?.recordReloadEvent(
         serviceName: 'main',
         type: 'failed',
         duration: Duration.zero,
-        error: 'Hot reload failed: $e',
+        error: errorMsg,
       );
+      try {
+        await hooks?.onError?.call(errorMsg);
+      } catch (hookError) {
+        print('⚠️  onError hook error: $hookError');
+      }
       return false;
     }
   }
@@ -737,10 +747,20 @@ class _DevelopmentServer {
     try {
       print('🔄 Performing hot restart...');
       _isRestarting = true;
+      try {
+        await hooks?.onBeforeRestart?.call();
+      } catch (e) {
+        print('⚠️  onBeforeRestart hook error: $e');
+      }
       final stopwatch = Stopwatch()..start();
       await _killUserProcess();
       await Future.delayed(Duration(milliseconds: 150));
       await _startUserScript();
+      try {
+        await hooks?.onAfterRestart?.call();
+      } catch (e) {
+        print('⚠️  onAfterRestart hook error: $e');
+      }
       stopwatch.stop();
       print('✅ Hot restart completed');
       _dashboard?.recordReloadEvent(
@@ -749,12 +769,18 @@ class _DevelopmentServer {
         duration: Duration(milliseconds: stopwatch.elapsedMilliseconds),
       );
     } catch (e) {
-      print('❌ Hot restart failed: $e');
+      final errorMsg = 'Hot restart failed: $e';
+      print('❌ $errorMsg');
+      try {
+        await hooks?.onError?.call(errorMsg);
+      } catch (hookError) {
+        print('⚠️  onError hook error: $hookError');
+      }
       _dashboard?.recordReloadEvent(
         serviceName: 'main',
         type: 'failed',
         duration: Duration.zero,
-        error: 'Hot restart failed: $e',
+        error: errorMsg,
       );
     } finally {
       _isRestarting = false;
@@ -763,7 +789,7 @@ class _DevelopmentServer {
 
   String _getRelativePath(String fullPath) {
     final currentDir = Directory.current.path;
-    if (fullPath.startsWith(currentDir)) {
+    if (fullPath.startsWith('$currentDir${Platform.pathSeparator}')) {
       return fullPath.substring(currentDir.length + 1);
     }
     return fullPath;

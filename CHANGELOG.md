@@ -1,3 +1,30 @@
+## [3.0.0]
+
+### Breaking Changes
+- **Minimum SDK version bumped to Dart 3.0.0** (was 2.17.0)
+- Removed unused `meta` dependency
+
+### New Features
+- **CLI executable**: Run `dart run utopia_hotreload bin/server.dart` for zero-config hot reload of any Dart script
+- **Lifecycle hooks**: `onBeforeReload`, `onAfterReload`, `onBeforeRestart`, `onAfterRestart`, `onFileChanged`, `onError` callbacks via `LifecycleHooks` class
+- **Configuration file support**: Load settings from `hotreload.yaml` via `ReloadConfigFile`
+- **Advanced file pattern matching**: Glob patterns, regex, and predefined presets (`dart-project`, `web-project`, `flutter-project`)
+- **WSL2 auto-detection**: Automatically detects WSL2 mounted Windows drives (`/mnt/`) and uses polling-based file watching since `inotify` doesn't work on those paths
+- **Polling configuration**: `usePolling` / `pollingDelay` options for manual control of file watching strategy
+
+### Bug Fixes
+- **Fixed multi-service manager**: Services now actually run user code with per-service VM hot reload (was using placeholder scripts)
+- **Fixed keyboard commands**: `r` (hot reload) and `R` (hot restart) now work correctly — previously both triggered hot restart
+- Fixed operator precedence bug in YAML config parser for `vm_service_port`
+- Fixed unawaited futures in multi-service manager
+- Fixed path prefix matching that could produce false positives on overlapping directory names
+
+### Improvements
+- File watcher now uses `DirectoryWatcher` from the `watcher` package for better cross-platform reliability
+- Memory usage detection uses `ProcessInfo.currentRss` instead of shelling out to `tasklist`/`ps`
+- Per-service hot reload via VM service `reloadSources()` with restart fallback
+- Concurrency guard prevents overlapping service restarts
+
 ## [2.0.0]
 - Improved reliability and performance of hot reload and hot restart
 - Enhanced file watching with better ignore pattern support

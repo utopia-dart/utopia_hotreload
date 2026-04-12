@@ -1,0 +1,34 @@
+# Hot Reload Configuration
+# Place this file as hotreload.yaml in your project root
+
+# Directories to watch for file changes
+watch_paths:
+  - lib
+  - bin
+
+# File extensions to monitor
+watch_extensions:
+  - .dart
+  - .yaml
+
+# Patterns to ignore
+ignore_patterns:
+  - .git/
+  - .dart_tool/
+  - build/
+  - pubspec.lock
+  - "*.g.dart"
+
+# Reload mode: auto, hotReload, or hotRestart
+mode: auto
+
+# Debounce delay in milliseconds
+debounce_ms: 500
+
+# Enable verbose logging
+verbose: false
+
+# Dashboard configuration
+dashboard:
+  enabled: false
+  port: 9000
